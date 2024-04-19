@@ -3,7 +3,7 @@
 from collections.abc import Generator
 from unittest.mock import AsyncMock, patch
 
-from mozart_api.models import BeolinkPeer
+from mozart_api.models import BeolinkPeer, Source, SourceArray
 import pytest
 
 from homeassistant.components.bang_olufsen.const import DOMAIN
@@ -42,11 +42,37 @@ def mock_mozart_client() -> Generator[AsyncMock, None, None]:
             "homeassistant.components.bang_olufsen.config_flow.MozartClient",
             new=mock_client,
         ),
+        patch(
+            "homeassistant.components.bang_olufsen.media_player.MozartClient",
+            new=mock_client,
+        ),
     ):
         client = mock_client.return_value
         client.get_beolink_self = AsyncMock()
         client.get_beolink_self.return_value = BeolinkPeer(
             friendly_name=TEST_FRIENDLY_NAME, jid=TEST_JID_1
+        )
+        client.get_available_sources = AsyncMock()
+        client.get_available_sources.return_value = SourceArray(
+            items=[
+                Source(
+                    name="AirPlay",
+                    id="airPlay",
+                    is_enabled=True,
+                    is_multiroom_available=False,
+                ),
+                Source(
+                    name="Tidal Connect",
+                    id="tidalConnect",
+                    is_enabled=True,
+                    is_multiroom_available=True,
+                ),
+                Source(
+                    name="Powerlink",
+                    id="pl",
+                    is_enabled=False,
+                ),
+            ]
         )
         yield client
 
