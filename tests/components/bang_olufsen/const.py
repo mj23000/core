@@ -2,6 +2,14 @@
 
 from ipaddress import IPv4Address, IPv6Address
 
+from mozart_api.models import (
+    PlaybackContentMetadata,
+    PlaybackError,
+    PlaybackProgress,
+    RenderingState,
+    Source,
+)
+
 from homeassistant.components.bang_olufsen.const import (
     ATTR_FRIENDLY_NAME,
     ATTR_ITEM_NUMBER,
@@ -11,6 +19,8 @@ from homeassistant.components.bang_olufsen.const import (
 )
 from homeassistant.components.zeroconf import ZeroconfServiceInfo
 from homeassistant.const import CONF_HOST, CONF_MODEL, CONF_NAME
+
+# config_flow
 
 TEST_HOST = "192.168.0.1"
 TEST_HOST_INVALID = "192.168.0"
@@ -79,4 +89,47 @@ TEST_DATA_ZEROCONF_IPV6 = ZeroconfServiceInfo(
         ATTR_TYPE_NUMBER: TEST_TYPE_NUMBER,
         ATTR_ITEM_NUMBER: TEST_ITEM_NUMBER,
     },
+)
+
+# media_player
+TEST_MEDIA_PLAYER_ENTITY_ID = "media_player.beosound_balance_11111111"
+TEST_SOURCES = ["Tidal Connect", "HDMI A"]
+TEST_AUDIO_SOURCES = ["Tidal Connect"]
+TEST_VIDEO_SOURCES = ["HDMI A"]
+TEST_FALLBACK_SOURCES = [
+    "Audio Streamer",
+    "Spotify Connect",
+    "Line-In",
+    "Optical",
+    "B&O Radio",
+    "Deezer",
+    "Tidal Connect",
+]
+
+# Websocket notifications
+
+TEST_PLAYBACK_METADATA = PlaybackContentMetadata(
+    album_name="Test album",
+    # art
+    artist_name="Test artist",
+    title="Test title",
+    total_duration_seconds=123,
+    track=1,
+    track_count=12,
+    organization="Test channel",
+)
+TEST_PLAYBACK_ERROR = PlaybackError(error="test", item=PlaybackContentMetadata())
+TEST_PLAYBACK_PROGRESS = PlaybackProgress(progress=1)
+TEST_PLAYBACK_STATE = RenderingState(value="idle")
+TEST_SOURCE_CHANGE = Source(
+    name="Tidal Connect",
+    id="tidalConnect",
+    is_enabled=True,
+    is_multiroom_available=True,
+)
+TEST_SOURCE_CHANGE_SPDIF = Source(
+    id="spdif",
+    is_enabled=True,
+    is_multiroom_available=True,
+    name="Optical",
 )

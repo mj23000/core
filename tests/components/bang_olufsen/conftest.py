@@ -22,6 +22,7 @@ from mozart_api.models import (
 import pytest
 
 from homeassistant.components.bang_olufsen.const import DOMAIN
+from homeassistant.core import HomeAssistant
 
 from .const import (
     TEST_DATA_CREATE_ENTRY,
@@ -43,6 +44,14 @@ def mock_config_entry():
         data=TEST_DATA_CREATE_ENTRY,
         title=TEST_NAME,
     )
+
+
+@pytest.fixture
+async def mock_media_player(hass: HomeAssistant, mock_config_entry, mock_mozart_client):
+    """Mock media_player entity."""
+
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
 
 
 @pytest.fixture
@@ -147,7 +156,7 @@ def mock_mozart_client() -> Generator[AsyncMock, None, None]:
                 fixed=True,
                 id="b355888b-2cde-5f94-8592-d47b71d52a27",
             ),
-            # Has "hdmi" as category, so be included in video sources
+            # Has "hdmi" as category, so should be included in video sources
             "b6591565-80f4-4356-bcd9-c92ca247f0a9": RemoteMenuItem(
                 action_list=[
                     Action(
