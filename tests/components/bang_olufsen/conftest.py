@@ -7,10 +7,17 @@ from mozart_api.models import (
     Action,
     BeolinkPeer,
     ContentItem,
+    PlaybackContentMetadata,
+    PlaybackProgress,
+    PlaybackState,
+    ProductState,
     RemoteMenuItem,
+    RenderingState,
+    SoftwareUpdateStatus,
     Source,
     SourceArray,
     SourceTypeEnum,
+    VolumeState,
 )
 import pytest
 
@@ -59,6 +66,20 @@ def mock_mozart_client() -> Generator[AsyncMock, None, None]:
         client.get_beolink_self = AsyncMock()
         client.get_beolink_self.return_value = BeolinkPeer(
             friendly_name=TEST_FRIENDLY_NAME, jid=TEST_JID_1
+        )
+        client.get_softwareupdate_status = AsyncMock()
+        client.get_softwareupdate_status.return_value = SoftwareUpdateStatus(
+            software_version="1.0.0", state=""
+        )
+        client.get_product_state = AsyncMock()
+        client.get_product_state.return_value = ProductState(
+            volume=VolumeState(),
+            playback=PlaybackState(
+                metadata=PlaybackContentMetadata(),
+                progress=PlaybackProgress(),
+                source=Source(),
+                state=RenderingState(value="started"),
+            ),
         )
         client.get_available_sources = AsyncMock()
         client.get_available_sources.return_value = SourceArray(

@@ -7,32 +7,46 @@ from homeassistant.core import HomeAssistant
 # pytestmark = pytest.mark.usefixtures("mock_setup_entry")
 
 
-# async def test_initialization(
-#     hass: HomeAssistant, mock_mozart_client, mock_config_entry
-# ) -> None:
-#     """Test the integration is initialized properly in _initialize, async_added_to_hass and __init__."""
-#     mock_config_entry.add_to_hass(hass)
-#     await hass.config_entries.async_setup(mock_config_entry.entry_id)
-#     await hass.async_block_till_done()
-
-#     media_player = BangOlufsenMediaPlayer(mock_config_entry, mock_mozart_client)
-
-
-async def test_update_sources(
+async def test_initialization(
     hass: HomeAssistant, mock_mozart_client, mock_config_entry
 ) -> None:
-    """Test sources are correctly handled in _update_sources."""
+    """Test the integration is initialized properly in _initialize, async_added_to_hass and __init__."""
+
     media_player = BangOlufsenMediaPlayer(mock_config_entry, mock_mozart_client)
+    media_player.hass = hass
 
     assert not media_player._sources
     assert not media_player._audio_sources
     assert not media_player._video_sources
 
-    await media_player._update_sources()
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
 
     assert len(media_player._video_sources) == 1
     assert len(media_player._audio_sources) == 1
-    assert len(media_player._sources) == (1 + 1)
+    assert len(media_player._sources) == (
+        len(media_player._video_sources) + len(media_player._audio_sources)
+    )
+    assert media_player.hass
+    assert media_player.hass.is_running
+
+
+# async def test_update_sources(
+#     hass: HomeAssistant, mock_mozart_client, mock_config_entry
+# ) -> None:
+#     """Test sources are correctly handled in _update_sources."""
+#     media_player = BangOlufsenMediaPlayer(mock_config_entry, mock_mozart_client)
+
+#     assert not media_player._sources
+#     assert not media_player._audio_sources
+#     assert not media_player._video_sources
+
+#     await media_player._update_sources()
+
+#     assert len(media_player._video_sources) == 1
+#     assert len(media_player._audio_sources) == 1
+#     assert len(media_player._sources) == (1 + 1)
 
 
 async def test_update_sources_audio_only(
