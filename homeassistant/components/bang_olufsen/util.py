@@ -2,17 +2,9 @@
 
 from __future__ import annotations
 
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.device_registry import DeviceEntry
-
-from .const import DOMAIN
+from . import BangOlufsenData
 
 
-def get_device(hass: HomeAssistant, unique_id: str) -> DeviceEntry:
-    """Get the device."""
-    device_registry = dr.async_get(hass)
-    device = device_registry.async_get_device({(DOMAIN, unique_id)})
-    assert device
-
-    return device
+def set_platform_initialized(data: BangOlufsenData) -> None:
+    """Increment platforms_initialized to indicate that a platform has been initialized."""
+    data.platforms_initialized += 1

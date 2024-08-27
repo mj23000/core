@@ -2,58 +2,84 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 import logging
+from typing import Any
 
+from aiohttp.client_exceptions import ClientConnectorError
+from mozart_api.exceptions import ApiException
 from mozart_api.models import (
+    BatteryState,
+    BeoRemoteButton,
+    ButtonEvent,
     ListeningModeProps,
     PlaybackContentMetadata,
     PlaybackError,
     PlaybackProgress,
     RenderingState,
     SoftwareUpdateState,
+    SoundSettings,
     Source,
+    SpeakerGroupOverview,
     VolumeState,
     WebsocketNotificationTag,
 )
 from mozart_api.mozart_client import MozartClient
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import CONF_DEVICE_ID, CONF_TYPE
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util.enum import try_parse_enum
 
 from .const import (
+    BANG_OLUFSEN_EVENT,
     BANG_OLUFSEN_WEBSOCKET_EVENT,
     CONNECTION_STATUS,
+    DOMAIN,
     WebsocketNotification,
 )
 from .entity import BangOlufsenBase
-from .util import get_device
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class BangOlufsenWebsocket(BangOlufsenBase):
-    """The WebSocket listeners."""
+class BangOlufsenCoordinator(DataUpdateCoordinator, BangOlufsenBase):
+    """The entity coordinator and WebSocket listener(s)."""
 
     def __init__(
         self, hass: HomeAssistant, entry: ConfigEntry, client: MozartClient
     ) -> None:
-        """Initialize the WebSocket listeners."""
-
+        """Initialize the entity coordinator."""
+        DataUpdateCoordinator.__init__(
+            self,
+            hass,
+            _LOGGER,
+            name="coordinator",
+            update_interval=timedelta(seconds=15),
+            always_update=False,
+        )
         BangOlufsenBase.__init__(self, entry, client)
 
-        self.hass = hass
-        self._device = get_device(hass, self._unique_id)
+        self._device = self.get_device()
 
         # WebSocket callbacks
-        self._client.get_notification_notifications(self.on_notification_notification)
-        self._client.get_on_connection_lost(self.on_connection_lost)
-        self._client.get_on_connection(self.on_connection)
         self._client.get_active_listening_mode_notifications(
             self.on_active_listening_mode
         )
+        self._client.get_active_speaker_group_notifications(
+            self.on_active_speaker_group
+        )
+        self._client.get_battery_notifications(self.on_battery_notification)
+        self._client.get_beo_remote_button_notifications(
+            self.on_beo_remote_button_notification
+        )
+        self._client.get_button_notifications(self.on_button_notification)
+        self._client.get_notification_notifications(self.on_notification_notification)
+        self._client.get_on_connection_lost(self.on_connection_lost)
+        self._client.get_on_connection(self.on_connection)
         self._client.get_playback_error_notifications(
             self.on_playback_error_notification
         )
@@ -69,11 +95,32 @@ class BangOlufsenWebsocket(BangOlufsenBase):
         self._client.get_software_update_state_notifications(
             self.on_software_update_state
         )
+        self._client.get_sound_settings_notifications(
+            self.on_sound_settings_notification
+        )
         self._client.get_source_change_notifications(self.on_source_change_notification)
         self._client.get_volume_notifications(self.on_volume_notification)
 
         # Used for firing events and debugging
         self._client.get_all_notifications_raw(self.on_all_notifications_raw)
+
+    def get_device(self) -> dr.DeviceEntry:
+        """Get the device."""
+        device_registry = dr.async_get(self.hass)
+        device = device_registry.async_get_device({(DOMAIN, self._unique_id)})
+        assert device
+
+        return device
+
+    async def _async_update_data(self) -> dict[str, Any]:
+        """Get all information needed by the polling entities."""
+        # Try to update coordinator_data.
+        try:
+            favourites = await self._client.get_presets(_request_timeout=5)
+        except (TimeoutError, ClientConnectorError, ApiException) as error:
+            raise UpdateFailed from error
+        else:
+            return favourites
 
     def _update_connection_status(self) -> None:
         """Update all entities of the connection status."""
@@ -101,6 +148,45 @@ class BangOlufsenWebsocket(BangOlufsenBase):
             notification,
         )
 
+    def on_active_speaker_group(self, notification: SpeakerGroupOverview) -> None:
+        """Send active_speaker_group dispatch."""
+        async_dispatcher_send(
+            self.hass,
+            f"{self._unique_id}_{WebsocketNotification.ACTIVE_SPEAKER_GROUP}",
+            notification,
+        )
+
+    def on_battery_notification(self, notification: BatteryState) -> None:
+        """Send battery dispatch."""
+        async_dispatcher_send(
+            self.hass,
+            f"{self._unique_id}_{WebsocketNotification.BATTERY}",
+            notification,
+        )
+
+    def on_beo_remote_button_notification(self, notification: BeoRemoteButton) -> None:
+        """Send beo_remote_button dispatch."""
+        if notification.type == "KeyPress":
+            # Trigger the device trigger
+            self.hass.bus.async_fire(
+                BANG_OLUFSEN_EVENT,
+                event_data={
+                    CONF_TYPE: f"{notification.key}_{notification.type}",
+                    CONF_DEVICE_ID: self._device.id,
+                },
+            )
+
+    def on_button_notification(self, notification: ButtonEvent) -> None:
+        """Send button dispatch."""
+        # Trigger the device trigger
+        self.hass.bus.async_fire(
+            BANG_OLUFSEN_EVENT,
+            event_data={
+                CONF_TYPE: f"{notification.button}_{notification.state}",
+                CONF_DEVICE_ID: self._device.id,
+            },
+        )
+
     def on_notification_notification(
         self, notification: WebsocketNotificationTag
     ) -> None:
@@ -108,10 +194,41 @@ class BangOlufsenWebsocket(BangOlufsenBase):
         # Try to match the notification type with available WebsocketNotification members
         notification_type = try_parse_enum(WebsocketNotification, notification.value)
 
-        if notification_type is WebsocketNotification.REMOTE_MENU_CHANGED:
+        if notification_type is WebsocketNotification.PROXIMITY:
+            async_dispatcher_send(
+                self.hass,
+                f"{self._unique_id}_{WebsocketNotification.PROXIMITY}",
+                notification,
+            )
+
+        elif notification_type is WebsocketNotification.REMOTE_MENU_CHANGED:
             async_dispatcher_send(
                 self.hass,
                 f"{self._unique_id}_{WebsocketNotification.REMOTE_MENU_CHANGED}",
+            )
+
+        elif notification_type is WebsocketNotification.CONFIGURATION:
+            async_dispatcher_send(
+                self.hass,
+                f"{self._unique_id}_{WebsocketNotification.CONFIGURATION}",
+            )
+
+        elif notification_type in (
+            WebsocketNotification.BLUETOOTH_DEVICES,
+            WebsocketNotification.REMOTE_CONTROL_DEVICES,
+        ):
+            async_dispatcher_send(
+                self.hass,
+                f"{self._unique_id}_{WebsocketNotification.BLUETOOTH_DEVICES}",
+            )
+        elif notification_type in (
+            WebsocketNotification.BEOLINK_PEERS,
+            WebsocketNotification.BEOLINK_LISTENERS,
+            WebsocketNotification.BEOLINK_AVAILABLE_LISTENERS,
+        ):
+            async_dispatcher_send(
+                self.hass,
+                f"{self._unique_id}_{WebsocketNotification.BEOLINK}",
             )
 
     def on_playback_error_notification(self, notification: PlaybackError) -> None:
@@ -148,6 +265,14 @@ class BangOlufsenWebsocket(BangOlufsenBase):
             notification,
         )
 
+    def on_sound_settings_notification(self, notification: SoundSettings) -> None:
+        """Send sound_settings dispatch."""
+        async_dispatcher_send(
+            self.hass,
+            f"{self._unique_id}_{WebsocketNotification.SOUND_SETTINGS}",
+            notification,
+        )
+
     def on_source_change_notification(self, notification: Source) -> None:
         """Send source_change dispatch."""
         async_dispatcher_send(
@@ -164,7 +289,7 @@ class BangOlufsenWebsocket(BangOlufsenBase):
             notification,
         )
 
-    async def on_software_update_state(self, notification: SoftwareUpdateState) -> None:
+    async def on_software_update_state(self, _: SoftwareUpdateState) -> None:
         """Check device sw version."""
         software_status = await self._client.get_softwareupdate_status()
 

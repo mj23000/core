@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import Enum, StrEnum
 from typing import Final
 
 from mozart_api.models import Source, SourceArray, SourceTypeEnum
@@ -21,6 +21,16 @@ class BangOlufsenSource:
     NET_RADIO: Final[Source] = Source(name="B&O Radio", id="netRadio")
     DEEZER: Final[Source] = Source(name="Deezer", id="deezer")
     TIDAL: Final[Source] = Source(name="Tidal", id="tidal")
+    USB_IN: Final[Source] = Source(name="USB", id="usbIn")
+    UNKNOWN: Final[Source] = Source(name="Unknown Source", id="unknown")
+
+
+class BangOlufsenRepeat(StrEnum):
+    """Enum used for translating device repeat settings to Home Assistant settings."""
+
+    all = "all"
+    one = "track"
+    off = "none"
 
 
 BANG_OLUFSEN_STATES: dict[str, MediaPlayerState] = {
@@ -32,7 +42,7 @@ BANG_OLUFSEN_STATES: dict[str, MediaPlayerState] = {
     "stopped": MediaPlayerState.PAUSED,
     "ended": MediaPlayerState.PAUSED,
     "error": MediaPlayerState.IDLE,
-    # A device's initial state is "unknown" and should be treated as "idle"
+    # A devices initial state is "unknown" and should be treated as "idle"
     "unknown": MediaPlayerState.IDLE,
 }
 
@@ -41,12 +51,20 @@ BANG_OLUFSEN_STATES: dict[str, MediaPlayerState] = {
 class BangOlufsenMediaType(StrEnum):
     """Bang & Olufsen specific media types."""
 
-    FAVOURITE = "favourite"
     DEEZER = "deezer"
+    FAVOURITE = "favourite"
+    OVERLAY_TTS = "overlay_tts"
     RADIO = "radio"
     TIDAL = "tidal"
     TTS = "provider"
-    OVERLAY_TTS = "overlay_tts"
+
+
+# Proximity detection for binary_sensor
+class BangOlufsenProximity(Enum):
+    """Proximity detection mapping.."""
+
+    proximityPresenceDetected = True  # noqa: N815
+    proximityPresenceNotDetected = False  # noqa: N815
 
 
 class BangOlufsenModel(StrEnum):
@@ -69,21 +87,58 @@ class WebsocketNotification(StrEnum):
     """Enum for WebSocket notification types."""
 
     ACTIVE_LISTENING_MODE = "active_listening_mode"
+    ACTIVE_SPEAKER_GROUP = "active_speaker_group"
+    ALARM_TRIGGERED = "alarm_triggered"
+    BATTERY = "battery"
+    BEOLINK_EXPERIENCES_RESULT = "beolink_experiences_result"
+    BEOLINK_JOIN_RESULT = "beolink_join_result"
+    BEO_REMOTE_BUTTON = "beo_remote_button"
+    BUTTON = "button"
+    CURTAINS = "curtains"
     PLAYBACK_ERROR = "playback_error"
     PLAYBACK_METADATA = "playback_metadata"
     PLAYBACK_PROGRESS = "playback_progress"
     PLAYBACK_SOURCE = "playback_source"
     PLAYBACK_STATE = "playback_state"
+    POWER_STATE = "power_state"
+    ROLE = "role"
     SOFTWARE_UPDATE_STATE = "software_update_state"
+    SOUND_SETTINGS = "sound_settings"
     SOURCE_CHANGE = "source_change"
     VOLUME = "volume"
 
     # Sub-notifications
+    BEOLINK_AVAILABLE_LISTENERS = "beolinkAvailableListeners"
+    BEOLINK_LISTENERS = "beolinkListeners"
+    BEOLINK_PEERS = "beolinkPeers"
+    BEOLINK = "beolink"
+    BLUETOOTH_DEVICES = "bluetooth"
+    CONFIGURATION = "configuration"
     NOTIFICATION = "notification"
+    PROXIMITY = "proximity"
+    REMOTE_CONTROL_DEVICES = "remoteControlDevices"
     REMOTE_MENU_CHANGED = "remoteMenuChanged"
 
     ALL = "all"
 
+
+class BangOlufsenModelSupport(Enum):
+    """Enum for storing compatibility of devices."""
+
+    PROXIMITY_SENSOR = (
+        BangOlufsenModel.BEOLAB_8,
+        BangOlufsenModel.BEOLAB_28,
+        BangOlufsenModel.BEOSOUND_2,
+        BangOlufsenModel.BEOSOUND_BALANCE,
+        BangOlufsenModel.BEOSOUND_LEVEL,
+        BangOlufsenModel.BEOSOUND_THEATRE,
+    )
+
+    HOME_CONTROL = (BangOlufsenModel.BEOSOUND_THEATRE,)
+
+
+# Range for bass and treble entities
+BASS_TREBLE_RANGE = range(-6, 6, 1)
 
 DOMAIN: Final[str] = "bang_olufsen"
 
@@ -91,8 +146,8 @@ DOMAIN: Final[str] = "bang_olufsen"
 DEFAULT_MODEL: Final[str] = BangOlufsenModel.BEOSOUND_BALANCE
 
 # Configuration.
-CONF_SERIAL_NUMBER: Final = "serial_number"
 CONF_BEOLINK_JID: Final = "jid"
+CONF_SERIAL_NUMBER: Final = "serial_number"
 
 # Models to choose from in manual configuration.
 COMPATIBLE_MODELS: list[str] = [x.value for x in BangOlufsenModel]
@@ -107,16 +162,20 @@ ATTR_FRIENDLY_NAME: Final[str] = "fn"
 BANG_OLUFSEN_ON: Final[str] = "on"
 
 VALID_MEDIA_TYPES: Final[tuple] = (
-    BangOlufsenMediaType.FAVOURITE,
     BangOlufsenMediaType.DEEZER,
-    BangOlufsenMediaType.RADIO,
-    BangOlufsenMediaType.TTS,
-    BangOlufsenMediaType.TIDAL,
+    BangOlufsenMediaType.FAVOURITE,
     BangOlufsenMediaType.OVERLAY_TTS,
+    BangOlufsenMediaType.RADIO,
+    BangOlufsenMediaType.TIDAL,
+    BangOlufsenMediaType.TTS,
     MediaType.MUSIC,
     MediaType.URL,
     MediaType.CHANNEL,
 )
+
+# Playback states for playing and not playing
+PLAYING: Final[tuple] = ("started", "buffering", BANG_OLUFSEN_ON)
+NOT_PLAYING: Final[tuple] = ("idle", "paused", "stopped", "ended", "unknown", "error")
 
 # Sources on the device that should not be selectable by the user
 HIDDEN_SOURCE_IDS: Final[tuple] = (
@@ -130,6 +189,7 @@ HIDDEN_SOURCE_IDS: Final[tuple] = (
     "wpl",
     "pl",
     "beolink",
+    "classicsAdapter",
     "usbIn",
 )
 
@@ -196,8 +256,56 @@ FALLBACK_SOURCES: Final[SourceArray] = SourceArray(
 )
 
 
-# Device events
+# Device trigger events
+BANG_OLUFSEN_EVENT: Final[str] = f"{DOMAIN}_event"
 BANG_OLUFSEN_WEBSOCKET_EVENT: Final[str] = f"{DOMAIN}_websocket_event"
 
 
 CONNECTION_STATUS: Final[str] = "CONNECTION_STATUS"
+BEOLINK_LEADER_COMMAND: Final[str] = "BEOLINK_LEADER_COMMAND"
+BEOLINK_LISTENER_COMMAND: Final[str] = "BEOLINK_LISTENER_COMMAND"
+BEOLINK_VOLUME: Final[str] = "BEOLINK_VOLUME"
+BEOLINK_RELATIVE_VOLUME: Final[str] = "BEOLINK_RELATIVE_VOLUME"
+
+
+# Valid commands and their expected parameter type for beolink_command service
+FLOAT_PARAMETERS: Final[tuple[str, str, str, type[float]]] = (
+    "set_volume_level",
+    "media_seek",
+    "set_relative_volume_level",
+    float,
+)
+BOOL_PARAMETERS: Final[tuple[str, type[bool]]] = ("mute_volume", bool)
+STR_PARAMETERS: Final[tuple[str, type[str]]] = ("select_source", str)
+NONE_PARAMETERS: Final[tuple[str, str, str, str, str, str, str, str, None]] = (
+    "volume_up",
+    "volume_down",
+    "media_play_pause",
+    "media_pause",
+    "media_play",
+    "media_stop",
+    "media_next_track",
+    "media_previous_track",
+    None,
+)
+
+# Tuple of accepted commands for input validation
+ACCEPTED_COMMANDS: Final[tuple[tuple[str]]] = (
+    FLOAT_PARAMETERS[:-1]  # type: ignore[assignment]
+    + BOOL_PARAMETERS[:-1]
+    + STR_PARAMETERS[:-1]
+    + NONE_PARAMETERS[:-1]
+)
+
+# Tuple of all commands and their types for executing commands.
+ACCEPTED_COMMANDS_LISTS: tuple[
+    tuple[str, str, str, type[float]],
+    tuple[str, type[bool]],
+    tuple[str, type[str]],
+    tuple[str, str, str, str, str, str, str, str, None],
+] = (
+    FLOAT_PARAMETERS,
+    BOOL_PARAMETERS,
+    STR_PARAMETERS,
+    NONE_PARAMETERS,
+)
