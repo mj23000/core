@@ -29,13 +29,21 @@ from homeassistant.util.enum import try_parse_enum
 
 from .const import (
     BANG_OLUFSEN_WEBSOCKET_EVENT,
+    CONF_HALO,
     CONNECTION_STATUS,
     DOMAIN,
     EVENT_TRANSLATION_MAP,
     WebsocketNotification,
 )
 from .entity import BangOlufsenHaloBase, BangOlufsenMozartBase
-from .halo import Halo, PowerEvent
+from .halo import (
+    BaseConfiguration,
+    Halo,
+    PowerEvent,
+    StatusEvent,
+    SystemEvent,
+    WheelEvent,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,15 +62,88 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
 
         self.hass = hass
 
+        self._client.get_button_event(self.on_button_event)
+        self._client.get_on_connection_lost(self.on_connection_lost)
+        self._client.get_on_connection(self.on_connection)
         self._client.get_power_event(self.on_power_event)
+        self._client.get_status_event(self.on_status_event)
+        self._client.get_system_event(self.on_system_event)
+        self._client.get_wheel_event(self.on_wheel_event)
 
-    def on_power_event(self, notification: PowerEvent) -> None:
-        """Send active_listening_mode dispatch."""
+        self._client.get_all_notifications_raw(self.on_all_notifications_raw)
+
+    def _update_connection_status(self) -> None:
+        """Update all entities of the connection status."""
+        async_dispatcher_send(
+            self.hass,
+            f"{self._unique_id}_{CONNECTION_STATUS}",
+            self._client.websocket_connected,
+        )
+
+    async def on_connection(self) -> None:
+        """Handle WebSocket connection made."""
+        _LOGGER.debug(
+            "Connected to the %s notification channel. Sending configuration",
+            self._entry.title,
+        )
+        if self._entry.options:
+            configuration = self._entry.options[CONF_HALO]
+        else:
+            configuration = self._entry.data[CONF_HALO]
+
+        # await asyncio.sleep(2)
+        await self._client.send(BaseConfiguration.from_dict(configuration))
+        self._update_connection_status()
+
+    def on_connection_lost(self) -> None:
+        """Handle WebSocket connection lost."""
+        _LOGGER.error("Lost connection to the %s", self._entry.title)
+        self._update_connection_status()
+
+    def on_button_event(self, event: ButtonEvent) -> None:
+        """Send halo_button dispatch."""
+        async_dispatcher_send(
+            self.hass,
+            f"{self._unique_id}_{WebsocketNotification.HALO_BUTTON}",
+            event,
+        )
+
+    def on_power_event(self, event: PowerEvent) -> None:
+        """Send halo_power dispatch."""
         async_dispatcher_send(
             self.hass,
             f"{self._unique_id}_{WebsocketNotification.HALO_POWER}",
-            notification,
+            event,
         )
+
+    def on_status_event(self, event: StatusEvent) -> None:
+        """Send halo_status dispatch."""
+        async_dispatcher_send(
+            self.hass,
+            f"{self._unique_id}_{WebsocketNotification.HALO_STATUS}",
+            event,
+        )
+
+    def on_system_event(self, event: SystemEvent) -> None:
+        """Send halo_system dispatch."""
+        async_dispatcher_send(
+            self.hass,
+            f"{self._unique_id}_{WebsocketNotification.HALO_SYSTEM}",
+            event,
+        )
+
+    def on_wheel_event(self, event: WheelEvent) -> None:
+        """Send halo_wheel dispatch."""
+        async_dispatcher_send(
+            self.hass,
+            f"{self._unique_id}_{WebsocketNotification.HALO_WHEEL}",
+            event,
+        )
+
+    def on_all_notifications_raw(self, event: dict) -> None:
+        """Receive all notifications."""
+
+        _LOGGER.warning("%s", event)
 
 
 class BangOlufsenMozartWebsocket(BangOlufsenMozartBase):

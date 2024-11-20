@@ -17,12 +17,17 @@ from homeassistant.config_entries import (
     ConfigFlowResult,
     OptionsFlow,
 )
-from homeassistant.const import ATTR_NAME, CONF_HOST, CONF_MODEL
+from homeassistant.const import (
+    ATTR_NAME,
+    CONF_ENTITIES,
+    CONF_HOST,
+    CONF_ICON,
+    CONF_MODEL,
+)
 from homeassistant.core import callback
-from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.selector import (
-    BooleanSelector,
-    BooleanSelectorConfig,
+    EntitySelector,
+    EntitySelectorConfig,
     SelectSelector,
     SelectSelectorConfig,
 )
@@ -35,16 +40,23 @@ from .const import (
     ATTR_MOZART_SERIAL_NUMBER,
     ATTR_TYPE_NUMBER,
     COMPATIBLE_MODELS,
+    CONF_HALO,
     CONF_PAGE_NAME,
     CONF_SERIAL_NUMBER,
+    CONF_SUBTITLE,
+    CONF_TEXT,
+    CONF_TITLE,
+    DEFAULT_HALO_CONFIGURATION,
     DEFAULT_MODEL,
     DOMAIN,
-    HALO_COMPATIBLE_PLATFORMS,
+    HALO_BUTTON_ICONS,
+    HALO_TEXT_LENGTH,
+    HALO_TITLE_LENGTH,
     ZEROCONF_HALO,
     ZEROCONF_MOZART,
     BangOlufsenModel,
 )
-from .halo import BaseConfiguration, Halo
+from .halo import BaseConfiguration, Button, ButtonState, Halo, Icon, Page, Text
 from .util import get_serial_number_from_jid
 
 
@@ -55,7 +67,9 @@ class BangOlufsenEntryData(TypedDict, total=False):
     jid: str
     model: str
     name: str
-    halo: BaseConfiguration
+    # Does not seem to handle objects well through restarts
+    # halo: BaseConfiguration
+    halo: dict
 
 
 # Map exception types to strings
@@ -223,6 +237,7 @@ class BangOlufsenConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 jid=self._beolink_jid,
                 model=self._model,
                 name=self._name,
+                halo=DEFAULT_HALO_CONFIGURATION,
             ),
         )
 
@@ -251,8 +266,8 @@ class BangOlufsenConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         config_entry: ConfigEntry,
     ) -> OptionsFlow:
         """Create the options flow."""
-        # Only return options for Halo
-
+        # This option should only be available for the Halo,
+        # but this is currently not supported by Home Assistant.
         return HaloOptionsFlowHandler()
 
 
@@ -261,37 +276,27 @@ class HaloOptionsFlowHandler(OptionsFlow):
 
     def __init__(self) -> None:
         """Initialize options."""
-        # self._entity_registry = er.async_get(self.hass)
+        self._entities: list[str] = []
+        self._configuration: BaseConfiguration
+        self._page: Page
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Manage the options."""
-        # if user_input is not None:
-        #     return self.async_create_entry(data=user_input)
+        if self.config_entry.data[CONF_MODEL] == BangOlufsenModel.BEOREMOTE_HALO:
+            self._configuration = BaseConfiguration.from_dict(
+                self.config_entry.data[CONF_HALO]
+            )
 
-        # # Get light entities
-        # options_schema = vol.Schema(
-        #     {
-        #         # vol.Required(CONF_PAGE_NAME): str,
-        #         # vol.Required(CONF_ENTITIES): str,
-        #         # vol.Required(CONF_PAGE): str,
-        #     }
-        # )
-        # # await self._get_compatible_entities()
-        # # data_schema = vol.Schema(
-        # #     {
-        # #         vol.Required(CONF_HOST): str,
-        # #         vol.Required(CONF_MODEL, default=DEFAULT_MODEL): SelectSelector(
-        # #             SelectSelectorConfig(options=COMPATIBLE_MODELS)
-        # #         ),
-        # #     }
-        # # )
-        return self.async_show_menu(
-            step_id="init",
-            menu_options=["add_page", "delete_page", "modify_page"],
+            return self.async_show_menu(
+                step_id="init",
+                menu_options=["add_page", "delete_page", "modify_page"],
+            )
+        return self.async_abort(
+            reason="invalid_model",
+            description_placeholders={"model": self.config_entry.data[CONF_MODEL]},
         )
-        # return self.async_show_form(step_id="init", data_schema=options_schema)
 
     async def async_step_add_page(
         self, user_input: dict[str, Any] | None = None
@@ -299,32 +304,83 @@ class HaloOptionsFlowHandler(OptionsFlow):
         """Add new page."""
 
         if user_input is not None:
-            # print(user_input)
-            # print(self._config_entry)
-            return self.async_create_entry(data=user_input)
+            self._page = Page(user_input[CONF_PAGE_NAME], [])
+            self._entities = user_input[CONF_ENTITIES]
 
+            return await self.async_step_create_buttons()
+
+        # TO DO filter unsupported entities
         options_schema = vol.Schema(
             {
                 vol.Required(CONF_PAGE_NAME): str,
+                vol.Required(CONF_ENTITIES): EntitySelector(
+                    EntitySelectorConfig(multiple=True)
+                ),
             }
-        ).extend(self._get_compatible_entities())
-
-        # entity_registry = er.async_get(self.hass)
-
-        # for entity in entity_registry.entities:
-        #     print(entity)
+        )
 
         return self.async_show_form(
             step_id="add_page",
             data_schema=options_schema,
         )
 
-    def _get_compatible_entities(self) -> dict[str, BooleanSelector]:
-        """Return compatible entities as a schema."""
-        entity_registry = er.async_get(self.hass)
+    async def async_step_create_buttons(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Add new page."""
+        if user_input is not None:
+            content = (
+                Icon(user_input[CONF_ICON])
+                if CONF_ICON in user_input
+                else Text(user_input[CONF_TEXT])
+            )
+            self._page.buttons.append(
+                Button(
+                    title=user_input[CONF_TITLE],
+                    subtitle=user_input[CONF_SUBTITLE],
+                    value=0,
+                    state=ButtonState.INACTIVE,
+                    content=content,
+                    id=self._entities[-1],
+                )
+            )
 
-        return {
-            entity: BooleanSelector(BooleanSelectorConfig())
-            for entity in entity_registry.entities
-            if entity.split(".")[0] in HALO_COMPATIBLE_PLATFORMS
-        }
+            self._entities.pop()
+
+            if not self._entities:
+                self._configuration.configuration.pages.append(self._page)
+                return self.async_create_entry(
+                    title=f"Page {self._page.title} added to configuration",
+                    data=BangOlufsenEntryData(
+                        host=self.config_entry.data[CONF_HOST],
+                        model=self.config_entry.data[CONF_MODEL],
+                        name=self.config_entry.title,
+                        halo=self._configuration.to_dict(),
+                    ),
+                )
+
+        options_schema = vol.Schema(
+            {
+                vol.Required(CONF_TITLE): vol.All(
+                    str,
+                    vol.Length(max=HALO_TITLE_LENGTH),
+                ),
+                vol.Required(CONF_SUBTITLE): vol.All(
+                    str,
+                    vol.Length(max=HALO_TITLE_LENGTH),
+                ),
+                vol.Exclusive(CONF_ICON, "content", "Error"): SelectSelector(
+                    SelectSelectorConfig(options=HALO_BUTTON_ICONS)
+                ),
+                vol.Exclusive(CONF_TEXT, "content", "Error"): vol.All(
+                    str,
+                    vol.Length(max=HALO_TEXT_LENGTH),
+                ),
+            },
+        )
+
+        return self.async_show_form(
+            step_id="create_buttons",
+            data_schema=options_schema,
+            description_placeholders={"entity": self._entities[-1]},
+        )

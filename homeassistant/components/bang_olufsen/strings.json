@@ -37,6 +37,9 @@
     }
   },
   "options": {
+    "abort": {
+      "invalid_model": "The {model} does not support configuration."
+    },
     "step": {
       "init": {
         "description": "Configure Beoremote Halo for Home Assistant",
@@ -50,7 +53,18 @@
         "title": "Add page",
         "description": "Create a new page with selected entities",
         "data": {
-          "page_name": "Page name"
+          "page_name": "Page name",
+          "entities": "Entities"
+        }
+      },
+      "create_buttons": {
+        "title": "Select icon",
+        "description": "Select an icon for {entity}",
+        "data": {
+          "icon": "Icon",
+          "text": "Text",
+          "title": "Title",
+          "subtitle": "Subtitle"
         }
       },
       "delete_page": {

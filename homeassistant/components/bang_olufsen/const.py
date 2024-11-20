@@ -12,7 +12,16 @@ from homeassistant.components.media_player import (
     MediaType,
     RepeatMode,
 )
-from homeassistant.const import Platform
+
+from .halo import (
+    BaseConfiguration,
+    Button,
+    ButtonState,
+    Configuration,
+    Icons,
+    Page,
+    Text,
+)
 
 
 class BangOlufsenSource:
@@ -137,8 +146,45 @@ DEFAULT_MODEL: Final[str] = BangOlufsenModel.BEOSOUND_BALANCE
 CONF_BEOLINK_JID: Final = "jid"
 CONF_SERIAL_NUMBER: Final = "serial_number"
 
+# Halo configuration
 CONF_PAGE_NAME: Final = "page_name"
 CONF_PAGE: Final = "page"
+CONF_TEXT: Final = "text"
+CONF_HALO: Final = "halo"
+CONF_TITLE: Final = "title"
+CONF_SUBTITLE: Final = "subtitle"
+HALO_TITLE_LENGTH: Final = 15
+HALO_PAGE_LENGTH: Final = 35
+HALO_TEXT_LENGTH: Final = 6
+
+# The names of compatible button icons for the Beoremote Halo
+HALO_BUTTON_ICONS: list[str] = [icon.name for icon in Icons]
+
+# Initial co
+DEFAULT_HALO_CONFIGURATION = BaseConfiguration(
+    configuration=Configuration(
+        pages=[
+            Page(
+                title="Setup Home Assistant",
+                buttons=[
+                    Button(
+                        title="Configure pages",
+                        subtitle="and buttons",
+                        value=0,
+                        state=ButtonState.ACTIVE,
+                        content=Text("testtesttesttesttesttest"),
+                        # content=Icon(Icons.ALARM),
+                        default=False,
+                        id="3952af65-561e-450e-b033-1ad35cdf7b7d",
+                    )
+                ],
+                id="5960e85c-5a7e-49fc-b029-d776f6925c1a",
+            )
+        ],
+        version="1.0.1",
+        id="e67550cc-b316-4f46-b838-717a00b1fa5e",
+    )
+).to_dict()
 
 # Models to choose from in manual configuration.
 # The Halo can only be discovered, so should not be included here.
@@ -149,9 +195,6 @@ COMPATIBLE_MODELS: list[str] = [
 
 ZEROCONF_MOZART: Final[str] = "_bangolufsen._tcp.local."
 ZEROCONF_HALO: Final[str] = "_zenith._tcp.local."
-
-# Compatible Halo platforms
-HALO_COMPATIBLE_PLATFORMS: Final[list[str]] = [Platform.LIGHT, Platform.SWITCH]
 
 # Attribute names for zeroconf discovery.
 ATTR_TYPE_NUMBER: Final[str] = "tn"

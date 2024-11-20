@@ -16,9 +16,9 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.util.ssl import get_default_context
 
-from .const import BEO_REMOTE_MODEL, COMPATIBLE_MODELS, DOMAIN, BangOlufsenModel
+from .const import BEO_REMOTE_MODEL, DOMAIN
 from .halo import Halo
-from .util import get_remote
+from .util import get_remote, is_halo
 from .websocket import BangOlufsenHaloWebsocket, BangOlufsenMozartWebsocket
 
 MOZART_PLATFORMS = [
@@ -189,25 +189,23 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> b
         manufacturer="Bang & Olufsen",
     )
 
-    # Mozart based products
-    if config_entry.data[CONF_MODEL] in COMPATIBLE_MODELS:
-        return await _setup_mozart(hass, config_entry)
-
-    # Halo
-    if config_entry.data[CONF_MODEL] == BangOlufsenModel.BEOREMOTE_HALO:
+    if is_halo(config_entry):
         return await _setup_halo(hass, config_entry)
 
-    return False
+    # Mozart based products
+    return await _setup_mozart(hass, config_entry)
 
 
-async def async_unload_entry(
-    hass: HomeAssistant, config_entry: BangOlufsenMozartConfigEntry
-) -> bool:
+async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    # Close the API client and WebSocket notification listener
-    config_entry.runtime_data.client.disconnect_notifications()
-    await config_entry.runtime_data.client.close_api_client()
 
-    return await hass.config_entries.async_unload_platforms(
-        config_entry, MOZART_PLATFORMS
-    )
+    # Close the API client and WebSocket notification listener
+    if is_halo(config_entry):
+        await config_entry.runtime_data.client.disconnect_notifications()
+        platforms = HALO_PLATFORMS
+    else:
+        config_entry.runtime_data.client.disconnect_notifications()
+        await config_entry.runtime_data.client.close_api_client()
+        platforms = MOZART_PLATFORMS
+
+    return await hass.config_entries.async_unload_platforms(config_entry, platforms)

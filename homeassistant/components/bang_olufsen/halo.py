@@ -2,7 +2,7 @@
 
 import asyncio
 from collections import defaultdict
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 import contextlib
 from dataclasses import dataclass
 from enum import StrEnum
@@ -29,7 +29,7 @@ WEBSOCKET_TIMEOUT = 5.0
 logger = logging.getLogger(__name__)
 
 
-class IconEnum(StrEnum):
+class Icons(StrEnum):
     """Available icons for buttons."""
 
     ALARM = "alarm"
@@ -108,7 +108,7 @@ class IconEnum(StrEnum):
 class Icon(DataClassJSONMixin):
     """Icon."""
 
-    icon: IconEnum
+    icon: Icons
 
 
 @dataclass
@@ -144,7 +144,7 @@ class Page(DataClassJSONMixin):
     """Page containing buttons."""
 
     title: str
-    buttons: Sequence[Button]
+    buttons: list[Button]
     id: str = str(uuid4())
 
 
@@ -152,7 +152,7 @@ class Page(DataClassJSONMixin):
 class Configuration(DataClassJSONMixin):
     """Configuration of pages."""
 
-    pages: Sequence[Page]
+    pages: list[Page]
     version: str = "1.0.1"
     id: str = str(uuid4())
 
@@ -513,49 +513,96 @@ class Halo:
 #     await asyncio.sleep(2)
 #     # print(halo._check_current_websocket_connection())
 #     # await halo._websocket.send_str(configuration.to_json())
-#     jsonstr = BaseConfiguration(
-#         Configuration(
-#             [
-#                 Page(
-#                     "Kitchen",
-#                     [
-#                         Button(
-#                             "Kitchen Light",
-#                             "On",
-#                             95,
-#                             ButtonState.ACTIVE,
-#                             Icon(IconEnum.LIGHTS),
-#                         )
-#                     ],
-#                 ),
-#                 Page(
-#                     "Living room",
-#                     [
-#                         Button(
-#                             "living room Light",
-#                             "On",
-#                             95,
-#                             ButtonState.ACTIVE,
-#                             Text("Test"),
-#                         )
-#                     ],
-#                 ),
-#                 Page(
-#                     "Living room",
-#                     [
-#                         Button(
-#                             "living room Light",
-#                             "Off",
-#                             95,
-#                             ButtonState.ACTIVE,
-#                             Text("Test"),
-#                         )
-#                     ],
-#                 ),
-#             ],
-#             "1.0.1",
-#         )
+# jsonstr = BaseConfiguration(
+#     Configuration(
+#         [
+#             Page(
+#                 "Kitchen",
+#                 [
+#                     Button(
+#                         "Kitchen Light",
+#                         "On",
+#                         95,
+#                         ButtonState.ACTIVE,
+#                         Icon(Icons.LIGHTS),
+#                     )
+#                 ],
+#             ),
+#             Page(
+#                 "Living room",
+#                 [
+#                     Button(
+#                         "living room Light",
+#                         "On",
+#                         95,
+#                         ButtonState.ACTIVE,
+#                         Text("Test"),
+#                     )
+#                 ],
+#             ),
+#             Page(
+#                 "Living room",
+#                 [
+#                     Button(
+#                         "living room Light",
+#                         "Off",
+#                         95,
+#                         ButtonState.ACTIVE,
+#                         Text("Test"),
+#                     )
+#                 ],
+#             ),
+#         ],
+#         "1.0.1",
 #     )
+# )
+# BaseConfiguration(
+#     configuration=Configuration(
+#         pages=[
+#             Page(
+#                 title="Setup Home Assistant",
+#                 buttons=[
+#                     Button(
+#                         title="Configure",
+#                         subtitle="Halo device",
+#                         value=0,
+#                         state=ButtonState.ACTIVE,
+#                         content=Icon(Icons.ALARM),
+#                         default=False,
+#                         id="3952af65-561e-450e-b033-1ad35cdf7b7d",
+#                     )
+#                 ],
+#                 id="5960e85c-5a7e-49fc-b029-d776f6925c1a",
+#             )
+#         ],
+#         version="1.0.1",
+#         id="e67550cc-b316-4f46-b838-717a00b1fa5e",
+#     )
+# )
+# BaseConfiguration(
+#     configuration=Configuration(
+#         pages=[
+#             Page(
+#                 title="Home Assistant",
+#                 buttons=[
+#                     Button(
+#                         title="Enter configuration",
+#                         subtitle="to add page and buttons",
+#                         value=0,
+#                         state=ButtonState.ACTIVE,
+#                         content=Icon("alarm"),
+#                         default=False,
+#                         id="63407fe2-3afb-4d52-8abb-b75ed7a2d8ec",
+#                     )
+#                 ],
+#                 id="efd75e74-a1de-4fff-9f22-9d403768fc0a",
+#             )
+#         ],
+#         version="1.0.1",
+#         id="c488fdf0-d826-4d8f-a012-109205e88587",
+#     )
+# )
+
 #     # print(jsonstr)
 #     await halo.send(jsonstr)
 #     # await halo._websocket.send_str(jsonstr)
