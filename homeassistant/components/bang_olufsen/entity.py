@@ -5,13 +5,23 @@ from __future__ import annotations
 from typing import cast
 
 from mozart_api.models import (
+    BatteryState,
+    BeoRemoteButton,
+    ButtonEvent,
+    ListeningModeProps,
     PlaybackContentMetadata,
+    PlaybackError,
     PlaybackProgress,
+    PowerStateEnum,
     RenderingState,
+    SoftwareUpdateState,
+    SoundSettings,
     Source,
+    SpeakerGroupOverview,
     VolumeLevel,
     VolumeMute,
     VolumeState,
+    WebsocketNotificationTag,
 )
 from mozart_api.mozart_client import MozartClient
 
@@ -22,44 +32,106 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
 from .const import DOMAIN
+from .halo import Halo
 
 
 class BangOlufsenBase:
     """Base class for BangOlufsen Home Assistant objects."""
 
-    def __init__(self, entry: ConfigEntry, client: MozartClient) -> None:
+    def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize the object."""
-
-        # Set the MozartClient
-        self._client = client
-
-        # get the input from the config entry.
-        self.entry: ConfigEntry = entry
+        # Get the input from the config entry.
+        # Use _entry instead of config_entry to avoid conflicts with Home Assistant classes such as DataUpdateCoordinator.
+        self._entry = config_entry
 
         # Set the configuration variables.
-        self._host: str = self.entry.data[CONF_HOST]
-        self._unique_id: str = cast(str, self.entry.unique_id)
+        self._host: str = self._entry.data[CONF_HOST]
+        self._unique_id: str = cast(str, self._entry.unique_id)
+
+
+class BangOlufsenMozartBase(BangOlufsenBase):
+    """Base class for Mozart BangOlufsen Home Assistant objects."""
+
+    def __init__(
+        self, config_entry: ConfigEntry, client: MozartClient | None = None
+    ) -> None:
+        """Initialize the object."""
+        super().__init__(config_entry)
+
+        # Set the MozartClient.
+        # Allowing the client to be set directly allows the coordinator to be initialized before being added to runtime_data.
+        if client:
+            self._client = client
+        else:
+            self._client = config_entry.runtime_data.client
 
         # Objects that get directly updated by notifications.
+        self._active_listening_mode = ListeningModeProps()
+        self._active_speaker_group = SpeakerGroupOverview(
+            friendly_name="", id="", is_deleteable=False
+        )
+        self._battery: BatteryState = BatteryState()
+        self._beo_remote_button: BeoRemoteButton = BeoRemoteButton()
+        self._button: ButtonEvent = ButtonEvent()
+        self._notification: WebsocketNotificationTag = WebsocketNotificationTag()
+        self._playback_error: PlaybackError = PlaybackError()
         self._playback_metadata: PlaybackContentMetadata = PlaybackContentMetadata()
         self._playback_progress: PlaybackProgress = PlaybackProgress(total_duration=0)
         self._playback_source: Source = Source()
         self._playback_state: RenderingState = RenderingState()
+        self._power_state: PowerStateEnum = PowerStateEnum()
+        self._software_update_state: SoftwareUpdateState = SoftwareUpdateState()
+        self._sound_settings: SoundSettings = SoundSettings()
         self._source_change: Source = Source()
         self._volume: VolumeState = VolumeState(
             level=VolumeLevel(level=0), muted=VolumeMute(muted=False)
         )
 
 
-class BangOlufsenEntity(Entity, BangOlufsenBase):
+class BangOlufsenHaloBase(BangOlufsenBase):
+    """Base class for Halo BangOlufsen Home Assistant objects."""
+
+    def __init__(self, config_entry: ConfigEntry, client: Halo | None = None) -> None:
+        """Initialize the object."""
+        super().__init__(config_entry)
+
+        # Set the Halo.
+        # Allowing the client to be set directly allows the coordinator to be initialized before being added to runtime_data.
+        if client:
+            self._client = client
+        else:
+            self._client = config_entry.runtime_data.client
+
+
+class BangOlufsenHaloEntity(Entity, BangOlufsenHaloBase):
     """Base Entity for BangOlufsen entities."""
 
     _attr_has_entity_name = True
     _attr_should_poll = False
 
-    def __init__(self, entry: ConfigEntry, client: MozartClient) -> None:
+    def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize the object."""
-        super().__init__(entry, client)
+        super().__init__(config_entry)
+
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, self._unique_id)})
+
+    @callback
+    def _async_update_connection_state(self, connection_state: bool) -> None:
+        """Update entity connection state."""
+        self._attr_available = connection_state
+
+        self.async_write_ha_state()
+
+
+class BangOlufsenMozartEntity(Entity, BangOlufsenMozartBase):
+    """Base Entity for BangOlufsen entities."""
+
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+
+    def __init__(self, config_entry: ConfigEntry) -> None:
+        """Initialize the object."""
+        super().__init__(config_entry)
 
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, self._unique_id)})
 

@@ -866,6 +866,11 @@ ZEROCONF = {
             "name": "xzg*",
         },
     ],
+    "_zenith._tcp.local.": [
+        {
+            "domain": "bang_olufsen",
+        },
+    ],
     "_zigate-zigbee-gateway._tcp.local.": [
         {
             "domain": "zha",
