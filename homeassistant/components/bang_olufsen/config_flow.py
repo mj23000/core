@@ -56,7 +56,7 @@ from .const import (
     ZEROCONF_MOZART,
     BangOlufsenModel,
 )
-from .halo import BaseConfiguration, Button, ButtonState, Halo, Icon, Page, Text
+from .halo import BaseConfiguration, Button, ButtonState, Halo, Icon, Icons, Page, Text
 from .util import get_serial_number_from_jid
 
 
@@ -330,7 +330,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
         """Add new page."""
         if user_input is not None:
             content = (
-                Icon(user_input[CONF_ICON])
+                Icon(Icons[user_input[CONF_ICON]])
                 if CONF_ICON in user_input
                 else Text(user_input[CONF_TEXT])
             )

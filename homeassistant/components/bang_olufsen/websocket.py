@@ -91,7 +91,6 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
         else:
             configuration = self._entry.data[CONF_HALO]
 
-        # await asyncio.sleep(2)
         await self._client.send(BaseConfiguration.from_dict(configuration))
         self._update_connection_status()
 

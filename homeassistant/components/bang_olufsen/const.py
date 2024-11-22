@@ -18,9 +18,9 @@ from .halo import (
     Button,
     ButtonState,
     Configuration,
+    Icon,
     Icons,
     Page,
-    Text,
 )
 
 
@@ -172,8 +172,7 @@ DEFAULT_HALO_CONFIGURATION = BaseConfiguration(
                         subtitle="and buttons",
                         value=0,
                         state=ButtonState.ACTIVE,
-                        content=Text("testtesttesttesttesttest"),
-                        # content=Icon(Icons.ALARM),
+                        content=Icon(Icons.ALARM),
                         default=False,
                         id="3952af65-561e-450e-b033-1ad35cdf7b7d",
                     )
