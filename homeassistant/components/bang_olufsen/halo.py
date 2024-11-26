@@ -6,6 +6,7 @@ from collections.abc import Callable
 import contextlib
 from dataclasses import dataclass
 from enum import StrEnum
+import json
 import logging
 from typing import Literal, cast
 from uuid import uuid4
@@ -15,6 +16,7 @@ from aiohttp import (
     ClientTimeout,
     ClientWebSocketResponse,
     ClientWSTimeout,
+    WSMessageTypeError,
 )
 from aiohttp.client_exceptions import (
     ClientConnectorError,
@@ -358,7 +360,6 @@ class Halo:
     async def disconnect_notifications(self) -> None:
         """Stop the WebSocket listener tasks."""
         self._websocket_listener_active = False
-        await self._websocket.close()
         self._websocket_task.cancel()
 
     async def _websocket_connection(self, host: str) -> None:
@@ -378,25 +379,32 @@ class Halo:
                     if self._on_connection:
                         await self._trigger_callback(self._on_connection)
 
-                    while True:
+                    while self._websocket_listener_active:
                         with contextlib.suppress(asyncio.TimeoutError):
                             notification = await asyncio.wait_for(
                                 self._websocket.receive_str(),
                                 timeout=WEBSOCKET_TIMEOUT,
                             )
 
+                            # Ensure that any notifications received after the disconnect command has been executed are not processed
+                            # if not self._websocket_listener_active:
+                            #     break
+
                             await self._on_message(notification)
+
+                    self.websocket_connected = False
+                    await self._websocket.close()
+                    return
 
             except (
                 ClientConnectorError,
                 ClientOSError,
                 TypeError,
                 ServerTimeoutError,
+                WSMessageTypeError,
             ) as error:
                 if self.websocket_connected:
                     logger.debug("%s : %s - %s", host, type(error), error)
-                    # print(error)
-                    # print(type(error))
                     self.websocket_connected = False
 
                     if self._on_connection_lost:
@@ -418,19 +426,14 @@ class Halo:
 
     async def _send(self, data: BaseConfiguration | BaseUpdate) -> None:
         """Send Configuration or Update."""
+        # TO DO add try/catch or suppress ClientConnectionResetError
         await self._websocket.send_str(cast(str, data.to_json()))
 
     async def _on_message(self, notification: str) -> None:
         """Handle WebSocket notifications."""
-        # print(notification)
-        # print(BaseEvent.from_json(notification))
-
         # Get the object type and deserialized object.
         try:
-            # notification_type = notification["event"]
-
             deserialized_data = BaseEvent.from_json(notification).event
-            # print(deserialized_data)
         except (ValueError, AttributeError) as error:
             logger.error(
                 "%s unable to deserialize WebSocket notification: (%s) with error: (%s : %s)",
@@ -450,7 +453,9 @@ class Halo:
             )
 
         if self._on_all_notifications_raw:
-            await self._trigger_callback(self._on_all_notifications_raw, notification)
+            await self._trigger_callback(
+                self._on_all_notifications_raw, json.loads(notification)
+            )
 
         # Handle specific notifications if defined
         triggered_notification = self._notification_callbacks[deserialized_data.type]

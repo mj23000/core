@@ -38,15 +38,15 @@
   },
   "options": {
     "abort": {
-      "invalid_model": "The {model} does not support configuration."
+      "invalid_model": "The {model} does not support configuration.",
+      "no_pages": "No pages available to delete or modify."
     },
     "step": {
       "init": {
         "description": "Configure Beoremote Halo for Home Assistant",
         "menu_options": {
           "add_page": "Create a new page",
-          "delete_page": "Delete existing page",
-          "modify_page": "Modify existing page"
+          "delete_pages": "Delete existing pages"
         }
       },
       "add_page": {
@@ -67,9 +67,12 @@
           "subtitle": "Subtitle"
         }
       },
-      "delete_page": {
-        "title": "Delete page",
-        "description": "Delete selected pages"
+      "delete_pages": {
+        "title": "Delete pages",
+        "description": "Delete selected pages",
+        "data": {
+          "pages": "Pages"
+        }
       }
     }
   },

@@ -149,8 +149,10 @@ CONF_SERIAL_NUMBER: Final = "serial_number"
 # Halo configuration
 CONF_PAGE_NAME: Final = "page_name"
 CONF_PAGE: Final = "page"
+CONF_PAGES: Final = "pages"
 CONF_TEXT: Final = "text"
 CONF_HALO: Final = "halo"
+CONF_ENTITY_MAP: Final = "entity_map"
 CONF_TITLE: Final = "title"
 CONF_SUBTITLE: Final = "subtitle"
 HALO_TITLE_LENGTH: Final = 15
@@ -324,6 +326,7 @@ MODEL_SUPPORT_MAP = {
 
 # Device events
 BANG_OLUFSEN_WEBSOCKET_EVENT: Final[str] = f"{DOMAIN}_websocket_event"
+BANG_OLUFSEN_HALO_WEBSOCKET_EVENT: Final[str] = f"{DOMAIN}_halo_websocket_event"
 
 
 CONNECTION_STATUS: Final[str] = "CONNECTION_STATUS"

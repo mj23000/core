@@ -25,6 +25,7 @@ from homeassistant.const import (
     CONF_MODEL,
 )
 from homeassistant.core import callback
+from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.selector import (
     EntitySelector,
     EntitySelectorConfig,
@@ -40,8 +41,10 @@ from .const import (
     ATTR_MOZART_SERIAL_NUMBER,
     ATTR_TYPE_NUMBER,
     COMPATIBLE_MODELS,
+    CONF_ENTITY_MAP,
     CONF_HALO,
     CONF_PAGE_NAME,
+    CONF_PAGES,
     CONF_SERIAL_NUMBER,
     CONF_SUBTITLE,
     CONF_TEXT,
@@ -56,7 +59,17 @@ from .const import (
     ZEROCONF_MOZART,
     BangOlufsenModel,
 )
-from .halo import BaseConfiguration, Button, ButtonState, Halo, Icon, Icons, Page, Text
+from .halo import (
+    BaseConfiguration,
+    Button,
+    ButtonState,
+    Configuration,
+    Halo,
+    Icon,
+    Icons,
+    Page,
+    Text,
+)
 from .util import get_serial_number_from_jid
 
 
@@ -70,6 +83,7 @@ class BangOlufsenEntryData(TypedDict, total=False):
     # Does not seem to handle objects well through restarts
     # halo: BaseConfiguration
     halo: dict
+    entity_map: dict[str, dict[str, str]]
 
 
 # Map exception types to strings
@@ -279,19 +293,25 @@ class HaloOptionsFlowHandler(OptionsFlow):
         self._entities: list[str] = []
         self._configuration: BaseConfiguration
         self._page: Page
+        self._entity_map: dict[str, dict[str, str]] = {}
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Manage the options."""
         if self.config_entry.data[CONF_MODEL] == BangOlufsenModel.BEOREMOTE_HALO:
-            self._configuration = BaseConfiguration.from_dict(
-                self.config_entry.data[CONF_HALO]
-            )
+            # Load stored configuration and entity map
+            if self.config_entry.options:
+                self._configuration = BaseConfiguration.from_dict(
+                    self.config_entry.options[CONF_HALO]
+                )
+                self._entity_map = self.config_entry.options[CONF_ENTITY_MAP]
+            else:
+                self._configuration = BaseConfiguration(Configuration([]))
 
             return self.async_show_menu(
                 step_id="init",
-                menu_options=["add_page", "delete_page", "modify_page"],
+                menu_options=["add_page", "delete_pages"],
             )
         return self.async_abort(
             reason="invalid_model",
@@ -301,10 +321,11 @@ class HaloOptionsFlowHandler(OptionsFlow):
     async def async_step_add_page(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Add new page."""
+        """Add a new page."""
 
         if user_input is not None:
             self._page = Page(user_input[CONF_PAGE_NAME], [])
+            self._entity_map[self._page.id] = {}
             self._entities = user_input[CONF_ENTITIES]
 
             return await self.async_step_create_buttons()
@@ -327,23 +348,22 @@ class HaloOptionsFlowHandler(OptionsFlow):
     async def async_step_create_buttons(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Add new page."""
+        """Add buttons to new page."""
         if user_input is not None:
-            content = (
-                Icon(Icons[user_input[CONF_ICON]])
-                if CONF_ICON in user_input
-                else Text(user_input[CONF_TEXT])
+            button = Button(
+                title=user_input[CONF_TITLE],
+                subtitle=user_input[CONF_SUBTITLE],
+                value=0,
+                state=ButtonState.INACTIVE,
+                content=(
+                    Icon(Icons[user_input[CONF_ICON]])
+                    if CONF_ICON in user_input
+                    else Text(user_input[CONF_TEXT])
+                ),
             )
-            self._page.buttons.append(
-                Button(
-                    title=user_input[CONF_TITLE],
-                    subtitle=user_input[CONF_SUBTITLE],
-                    value=0,
-                    state=ButtonState.INACTIVE,
-                    content=content,
-                    id=self._entities[-1],
-                )
-            )
+            # save button id in dict with entity_id
+            self._entity_map[self._page.id][button.id] = self._entities[-1]
+            self._page.buttons.append(button)
 
             self._entities.pop()
 
@@ -356,31 +376,198 @@ class HaloOptionsFlowHandler(OptionsFlow):
                         model=self.config_entry.data[CONF_MODEL],
                         name=self.config_entry.title,
                         halo=self._configuration.to_dict(),
+                        entity_map=self._entity_map,
                     ),
                 )
 
-        options_schema = vol.Schema(
-            {
-                vol.Required(CONF_TITLE): vol.All(
-                    str,
-                    vol.Length(max=HALO_TITLE_LENGTH),
-                ),
-                vol.Required(CONF_SUBTITLE): vol.All(
-                    str,
-                    vol.Length(max=HALO_TITLE_LENGTH),
-                ),
-                vol.Exclusive(CONF_ICON, "content", "Error"): SelectSelector(
-                    SelectSelectorConfig(options=HALO_BUTTON_ICONS)
-                ),
-                vol.Exclusive(CONF_TEXT, "content", "Error"): vol.All(
-                    str,
-                    vol.Length(max=HALO_TEXT_LENGTH),
-                ),
-            },
-        )
-
         return self.async_show_form(
             step_id="create_buttons",
-            data_schema=options_schema,
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_TITLE): vol.All(
+                        str,
+                        vol.Length(max=HALO_TITLE_LENGTH),
+                    ),
+                    vol.Required(CONF_SUBTITLE): vol.All(
+                        str,
+                        vol.Length(max=HALO_TITLE_LENGTH),
+                    ),
+                    vol.Exclusive(CONF_ICON, "content", "Error"): SelectSelector(
+                        SelectSelectorConfig(options=HALO_BUTTON_ICONS)
+                    ),
+                    vol.Exclusive(CONF_TEXT, "content", "Error"): vol.All(
+                        str,
+                        vol.Length(max=HALO_TEXT_LENGTH),
+                    ),
+                },
+            ),
             description_placeholders={"entity": self._entities[-1]},
         )
+
+    def _get_page_titles_with_id(self) -> list[str]:
+        """Get a list of unique strings representing pages from configuration or abort if not available."""
+
+        pages = [
+            f"{page.title}:{page.id}"
+            for page in self._configuration.configuration.pages
+        ]
+        if not pages:
+            raise AbortFlow("no_pages")
+
+        return pages
+
+    async def async_step_delete_pages(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Delete selected pages."""
+
+        if user_input is not None:
+            for page in user_input[CONF_PAGES]:
+                page_id = page.split(":")[-1]
+                for page_object in self._configuration.configuration.pages.copy():
+                    if page_object.id == page_id:
+                        self._configuration.configuration.pages.remove(page_object)
+                        break
+
+            return self.async_create_entry(
+                title="Updated configuration",
+                data=BangOlufsenEntryData(
+                    host=self.config_entry.data[CONF_HOST],
+                    model=self.config_entry.data[CONF_MODEL],
+                    name=self.config_entry.title,
+                    halo=self._configuration.to_dict(),
+                    entity_map=self._entity_map,
+                ),
+            )
+
+        # Check existing pages to determine if the options should abort
+        pages = self._get_page_titles_with_id()
+
+        return self.async_show_form(
+            step_id="delete_pages",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_PAGES): SelectSelector(
+                        SelectSelectorConfig(
+                            options=pages,
+                            multiple=True,
+                        )
+                    ),
+                }
+            ),
+        )
+
+    # TO DO add modify pages/buttons steps
+
+    # async def async_step_modify_pages(
+    #     self, user_input: dict[str, Any] | None = None
+    # ) -> ConfigFlowResult:
+    #     """Delete selected pages."""
+
+    #     if user_input is not None:
+    #         await self.async_step_modify_buttons(user_input)
+
+    #         return self.async_create_entry(
+    #             title="Updated configuration",
+    #             data=BangOlufsenEntryData(
+    #                 host=self.config_entry.data[CONF_HOST],
+    #                 model=self.config_entry.data[CONF_MODEL],
+    #                 name=self.config_entry.title,
+    #                 halo=self._configuration.to_dict(),
+    #                 entity_map=self._entity_map,
+    #             ),
+    #         )
+
+    #     # Check existing pages to determine if the options should abort
+    #     pages = self._get_page_titles_with_id()
+
+    #     return self.async_show_form(
+    #         step_id="modify_pages",
+    #         data_schema=vol.Schema(
+    #             {
+    #                 vol.Required(CONF_PAGE): SelectSelector(
+    #                     SelectSelectorConfig(options=pages)
+    #                 ),
+    #             }
+    #         ),
+    #     )
+
+    # async def async_step_modify_buttons(
+    #     self, user_input: dict[str, Any] | None = None
+    # ) -> ConfigFlowResult:
+    #     """Modify buttons in a page."""
+    #     if user_input is not None:
+    #         button = Button(
+    #             title=user_input[CONF_TITLE],
+    #             subtitle=user_input[CONF_SUBTITLE],
+    #             value=0,
+    #             state=ButtonState.INACTIVE,
+    #             content=(
+    #                 Icon(Icons[user_input[CONF_ICON]])
+    #                 if CONF_ICON in user_input
+    #                 else Text(user_input[CONF_TEXT])
+    #             ),
+    #         )
+    #         # save button id in dict with entity_id
+    #         self._entity_map[self._page.id][button.id] = self._entities[-1]
+    #         self._page.buttons.append(button)
+
+    #         self._entities.pop()
+
+    #         if not self._entities:
+    #             self._configuration.configuration.pages.append(self._page)
+    #             return self.async_create_entry(
+    #                 title=f"Page {self._page.title} Modified",
+    #                 data=BangOlufsenEntryData(
+    #                     host=self.config_entry.data[CONF_HOST],
+    #                     model=self.config_entry.data[CONF_MODEL],
+    #                     name=self.config_entry.title,
+    #                     halo=self._configuration.to_dict(),
+    #                     entity_map=self._entity_map,
+    #                 ),
+    #             )
+
+    #     return self.async_show_form(
+    #         step_id="modify_page",
+    #         data_schema=vol.Schema(
+    #             {
+    #                 vol.Required(CONF_TITLE, default=): vol.All(
+    #                     str,
+    #                     vol.Length(max=HALO_TITLE_LENGTH),
+
+    #                 ),
+    #                 vol.Required(CONF_SUBTITLE): vol.All(
+    #                     str,
+    #                     vol.Length(max=HALO_TITLE_LENGTH),
+    #                 ),
+    #                 vol.Exclusive(CONF_ICON, "content", "Error"): SelectSelector(
+    #                     SelectSelectorConfig(options=HALO_BUTTON_ICONS)
+    #                 ),
+    #                 vol.Exclusive(CONF_TEXT, "content", "Error"): vol.All(
+    #                     str,
+    #                     vol.Length(max=HALO_TEXT_LENGTH),
+    #                 ),
+    #             },
+    #         ),
+    #         description_placeholders={"entity": self._entities[-1]},
+    #     )
+
+
+# "modify_pages": {
+# 	"title": "Modify page",
+# 	"description": "Select a page to modify",
+# 	"data": {
+# 		"page": "Page"
+# 	}
+# },
+# "modify_page": {
+# 	"title": "Modify button",
+# 	"description": "Modify button in selected page",
+# 	"data": {
+# 		"entity": "Entity",
+# 		"icon": "Icon",
+# 		"text": "Text",
+# 		"title": "Title",
+# 		"subtitle": "Subtitle"
+# 	}
+# }

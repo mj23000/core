@@ -28,10 +28,10 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.util.enum import try_parse_enum
 
 from .const import (
+    BANG_OLUFSEN_HALO_WEBSOCKET_EVENT,
     BANG_OLUFSEN_WEBSOCKET_EVENT,
     CONF_HALO,
     CONNECTION_STATUS,
-    DOMAIN,
     EVENT_TRANSLATION_MAP,
     WebsocketNotification,
 )
@@ -61,6 +61,7 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
         super().__init__(config_entry, client)
 
         self.hass = hass
+        self._device = self.get_device(hass, self._unique_id)
 
         self._client.get_button_event(self.on_button_event)
         self._client.get_on_connection_lost(self.on_connection_lost)
@@ -90,6 +91,8 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
             configuration = self._entry.options[CONF_HALO]
         else:
             configuration = self._entry.data[CONF_HALO]
+
+        _LOGGER.error("Sending configuration %s", configuration)
 
         await self._client.send(BaseConfiguration.from_dict(configuration))
         self._update_connection_status()
@@ -141,8 +144,12 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
 
     def on_all_notifications_raw(self, event: dict) -> None:
         """Receive all notifications."""
+        # Add the device_id and serial_number to the notification
+        event["device_id"] = self._device.id
+        event["serial_number"] = int(self._unique_id)
 
-        _LOGGER.warning("%s", event)
+        _LOGGER.debug("%s", event)
+        self.hass.bus.async_fire(BANG_OLUFSEN_HALO_WEBSOCKET_EVENT, event)
 
 
 class BangOlufsenMozartWebsocket(BangOlufsenMozartBase):
@@ -158,7 +165,7 @@ class BangOlufsenMozartWebsocket(BangOlufsenMozartBase):
         super().__init__(config_entry, client)
 
         self.hass = hass
-        self._device = self.get_device()
+        self._device = self.get_device(hass, self._unique_id)
 
         # WebSocket callbacks
         self._client.get_active_listening_mode_notifications(
@@ -198,14 +205,6 @@ class BangOlufsenMozartWebsocket(BangOlufsenMozartBase):
 
         # Used for firing events and debugging
         self._client.get_all_notifications_raw(self.on_all_notifications_raw)
-
-    def get_device(self) -> dr.DeviceEntry:
-        """Get the device."""
-        device_registry = dr.async_get(self.hass)
-        device = device_registry.async_get_device({(DOMAIN, self._unique_id)})
-        assert device
-
-        return device
 
     def _update_connection_status(self) -> None:
         """Update all entities of the connection status."""

@@ -166,7 +166,9 @@ async def _setup_halo(
 
     await hass.config_entries.async_forward_entry_setups(config_entry, HALO_PLATFORMS)
 
-    await client.connect_notifications()
+    await client.connect_notifications(reconnect=True)
+
+    config_entry.async_on_unload(config_entry.add_update_listener(async_update_options))
 
     return True
 

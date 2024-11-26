@@ -27,7 +27,8 @@ from mozart_api.mozart_client import MozartClient
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
@@ -47,6 +48,15 @@ class BangOlufsenBase:
         # Set the configuration variables.
         self._host: str = self._entry.data[CONF_HOST]
         self._unique_id: str = cast(str, self._entry.unique_id)
+
+    @staticmethod
+    def get_device(hass: HomeAssistant, unique_id: str) -> dr.DeviceEntry:
+        """Get the device."""
+        device_registry = dr.async_get(hass)
+        device = device_registry.async_get_device({(DOMAIN, unique_id)})
+        assert device
+
+        return device
 
 
 class BangOlufsenMozartBase(BangOlufsenBase):
