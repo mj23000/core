@@ -135,7 +135,7 @@ class Button(DataClassJSONMixin):
     subtitle: str
     value: int
     state: ButtonState
-    # None is allow during serializing, but not during deserializing
+    # None is allowed during serializing, but not during deserializing
     content: Icon | Text | None
     default: bool = False
     id: str = str(uuid4())

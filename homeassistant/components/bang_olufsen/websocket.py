@@ -22,14 +22,17 @@ from mozart_api.models import (
 from mozart_api.mozart_client import MozartClient
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr
+from homeassistant.const import CONF_ENTITY_ID, Platform
+from homeassistant.core import Event, EventStateChangedData, HomeAssistant
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.util.enum import try_parse_enum
 
 from .const import (
     BANG_OLUFSEN_HALO_WEBSOCKET_EVENT,
     BANG_OLUFSEN_WEBSOCKET_EVENT,
+    CONF_ENTITY_MAP,
     CONF_HALO,
     CONNECTION_STATUS,
     EVENT_TRANSLATION_MAP,
@@ -38,6 +41,9 @@ from .const import (
 from .entity import BangOlufsenHaloBase, BangOlufsenMozartBase
 from .halo import (
     BaseConfiguration,
+    BaseUpdate,
+    Button,
+    ButtonState,
     Halo,
     PowerEvent,
     StatusEvent,
@@ -62,6 +68,9 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
 
         self.hass = hass
         self._device = self.get_device(hass, self._unique_id)
+        self._entity_registry = er.async_get(self.hass)
+        self._entity_map: dict[str, str] | None = None
+        self._configuration: BaseConfiguration | None = None
 
         self._client.get_button_event(self.on_button_event)
         self._client.get_on_connection_lost(self.on_connection_lost)
@@ -72,6 +81,80 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
         self._client.get_wheel_event(self.on_wheel_event)
 
         self._client.get_all_notifications_raw(self.on_all_notifications_raw)
+
+        # Track entity changes to sync with Halo configuration
+        if config_entry.options:
+            self._entity_map = config_entry.options[CONF_ENTITY_MAP]
+
+            entities = list(self._entity_map.values())
+            async_track_state_change_event(
+                self.hass,
+                entities,
+                self._handle_entity_state_change,
+            )
+
+    async def _handle_entity_state_change(
+        self,
+        event: Event[EventStateChangedData],
+    ) -> None:
+        """Handle state change of entities."""
+        entity_id = event.data[CONF_ENTITY_ID]
+
+        entity_type = entity_id.split(".")[0]
+
+        if self._entity_map is None:
+            return
+
+        # Get the button ids
+        button_ids = []
+        for mapped_button_id, mapped_entity_id in self._entity_map.items():
+            if mapped_entity_id == entity_id:
+                button_ids.append(mapped_button_id)
+
+        for button_id in button_ids:
+            if entity_type == Platform.SENSOR:
+                await self._handle_sensor(entity_id, button_id)
+            elif entity_type == Platform.BUTTON:
+                pass
+
+        # TO DO handle entity deletion
+
+    def _get_button_from_id(self, button_id: str) -> Button | None:
+        """Get Button from button_id."""
+        if self._configuration is not None:
+            for page in self._configuration.configuration.pages:
+                for button in page.buttons:
+                    if button.id == button_id:
+                        return button
+        return None
+
+    async def _handle_sensor(self, entity_id: str, button_id: str) -> None:
+        """Handle state change events of Sensor entities."""
+        state = self.hass.states.get(entity_id)
+        if state is None:
+            _LOGGER.error("Unable to update state of %s", entity_id)
+            return
+
+        try:
+            button_state = int(state.state)
+        except ValueError:
+            _LOGGER.error("Invalid state %s", state.state)
+            button_state = 0
+
+        button = self._get_button_from_id(button_id)
+
+        if button is None:
+            return
+
+        button.value = button_state
+        button.state = ButtonState.ACTIVE if button_state > 0 else ButtonState.INACTIVE
+
+        # 2024-12-03 20:06:46.449 DEBUG (MainThread) [homeassistant.components.bang_olufsen.websocket] {'event': {'type': 'status', 'state': 'error', 'message': 'homeautomationsystem::message::Update|homeautomationsystem::schema::Update::UpdateProperty [No oneof found] {"title":"das","subtitle":"ssd","value":100,"state":"active","content":{"icon":"butler"},"default":false,"id":"65482a7e-0556-42dc-b310-63ab3c4be841"}'}, 'device_id': '73a0dd7ea779f9d662b28c98e3c5113a', 'serial_number': 32786583}
+        await self._client.send(BaseUpdate(update=button))
+        # if state.state
+        # entity_registry = er.async_get(self.hass)
+        # <Event state_changed[L]: entity_id=sensor.beoremote_halo_32786583_battery_level, old_state=<state sensor.beoremote_halo_32786583_battery_level=unknown; state_class=measurement, unit_of_measurement=%, device_class=battery, friendly_name=Beoremote Halo-32786583 Battery level @ 2024-12-03T19:01:20.273815+01:00>, new_state=<state sensor.beoremote_halo_32786583_battery_level=100; state_class=measurement, unit_of_measurement=%, device_class=battery, friendly_name=Beoremote Halo-32786583 Battery level @ 2024-12-03T19:01:20.293381+01:00>>
+        # self._entity_registry.async_get(event.event_type)
 
     def _update_connection_status(self) -> None:
         """Update all entities of the connection status."""
@@ -89,12 +172,13 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
         )
         if self._entry.options:
             configuration = self._entry.options[CONF_HALO]
+
         else:
             configuration = self._entry.data[CONF_HALO]
 
-        _LOGGER.error("Sending configuration %s", configuration)
+        self._configuration = BaseConfiguration.from_dict(configuration)
 
-        await self._client.send(BaseConfiguration.from_dict(configuration))
+        await self._client.send(self._configuration)
         self._update_connection_status()
 
     def on_connection_lost(self) -> None:

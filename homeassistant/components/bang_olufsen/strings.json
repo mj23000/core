@@ -39,7 +39,8 @@
   "options": {
     "abort": {
       "invalid_model": "The {model} does not support configuration.",
-      "no_pages": "No pages available to delete or modify."
+      "no_pages": "No pages available to delete.",
+      "invalid_page_name": "Can't add page {page_name} as names must be unique."
     },
     "step": {
       "init": {

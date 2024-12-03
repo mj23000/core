@@ -25,7 +25,6 @@ from homeassistant.const import (
     CONF_MODEL,
 )
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.selector import (
     EntitySelector,
     EntitySelectorConfig,
@@ -83,7 +82,7 @@ class BangOlufsenEntryData(TypedDict, total=False):
     # Does not seem to handle objects well through restarts
     # halo: BaseConfiguration
     halo: dict
-    entity_map: dict[str, dict[str, str]]
+    entity_map: dict[str, str]
 
 
 # Map exception types to strings
@@ -293,7 +292,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
         self._entities: list[str] = []
         self._configuration: BaseConfiguration
         self._page: Page
-        self._entity_map: dict[str, dict[str, str]] = {}
+        self._entity_map: dict[str, str] = {}
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -324,8 +323,18 @@ class HaloOptionsFlowHandler(OptionsFlow):
         """Add a new page."""
 
         if user_input is not None:
+            # Ensure that all page names are unique
+            page_names = [
+                page.title for page in self._configuration.configuration.pages
+            ]
+
+            if user_input[CONF_PAGE_NAME] in page_names:
+                return self.async_abort(
+                    reason="invalid_page_name",
+                    description_placeholders={"page_name": user_input[CONF_PAGE_NAME]},
+                )
+
             self._page = Page(user_input[CONF_PAGE_NAME], [])
-            self._entity_map[self._page.id] = {}
             self._entities = user_input[CONF_ENTITIES]
 
             return await self.async_step_create_buttons()
@@ -362,7 +371,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
                 ),
             )
             # save button id in dict with entity_id
-            self._entity_map[self._page.id][button.id] = self._entities[-1]
+            self._entity_map[button.id] = self._entities[-1]
             self._page.buttons.append(button)
 
             self._entities.pop()
@@ -404,28 +413,15 @@ class HaloOptionsFlowHandler(OptionsFlow):
             description_placeholders={"entity": self._entities[-1]},
         )
 
-    def _get_page_titles_with_id(self) -> list[str]:
-        """Get a list of unique strings representing pages from configuration or abort if not available."""
-
-        pages = [
-            f"{page.title}:{page.id}"
-            for page in self._configuration.configuration.pages
-        ]
-        if not pages:
-            raise AbortFlow("no_pages")
-
-        return pages
-
     async def async_step_delete_pages(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Delete selected pages."""
 
         if user_input is not None:
-            for page in user_input[CONF_PAGES]:
-                page_id = page.split(":")[-1]
+            for page_name in user_input[CONF_PAGES]:
                 for page_object in self._configuration.configuration.pages.copy():
-                    if page_object.id == page_id:
+                    if page_object.title == page_name:
                         self._configuration.configuration.pages.remove(page_object)
                         break
 
@@ -439,9 +435,10 @@ class HaloOptionsFlowHandler(OptionsFlow):
                     entity_map=self._entity_map,
                 ),
             )
+        pages = [page.title for page in self._configuration.configuration.pages]
 
-        # Check existing pages to determine if the options should abort
-        pages = self._get_page_titles_with_id()
+        if len(pages) == 0:
+            return self.async_abort(reason="no_pages")
 
         return self.async_show_form(
             step_id="delete_pages",
