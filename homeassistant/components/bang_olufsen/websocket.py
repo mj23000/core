@@ -21,8 +21,9 @@ from mozart_api.models import (
 )
 from mozart_api.mozart_client import MozartClient
 
+from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, SERVICE_PRESS
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_ENTITY_ID, Platform
+from homeassistant.const import ATTR_ENTITY_ID, CONF_ENTITY_ID, Platform
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -43,11 +44,14 @@ from .halo import (
     BaseConfiguration,
     BaseUpdate,
     Button,
+    ButtonEvent as HaloButtonEvent,
+    ButtonEventState,
     ButtonState,
     Halo,
     PowerEvent,
     StatusEvent,
     SystemEvent,
+    UpdateButton,
     WheelEvent,
 )
 
@@ -69,7 +73,7 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
         self.hass = hass
         self._device = self.get_device(hass, self._unique_id)
         self._entity_registry = er.async_get(self.hass)
-        self._entity_map: dict[str, str] | None = None
+        self._entity_map: dict[str, str] = {}
         self._configuration: BaseConfiguration | None = None
 
         self._client.get_button_event(self.on_button_event)
@@ -102,7 +106,7 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
 
         entity_type = entity_id.split(".")[0]
 
-        if self._entity_map is None:
+        if not self._entity_map:
             return
 
         # Get the button ids
@@ -112,10 +116,11 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
                 button_ids.append(mapped_button_id)
 
         for button_id in button_ids:
+            # Add event for testing
             if entity_type == Platform.SENSOR:
                 await self._handle_sensor(entity_id, button_id)
-            elif entity_type == Platform.BUTTON:
-                pass
+            # elif entity_type == Platform.BUTTON:
+            #     await self._handle_button(entity_id, button_id)
 
         # TO DO handle entity deletion
 
@@ -139,22 +144,57 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
             button_state = int(state.state)
         except ValueError:
             _LOGGER.error("Invalid state %s", state.state)
-            button_state = 0
+            if state.state == "playing":
+                button_state = 1
+            else:
+                button_state = 0
 
         button = self._get_button_from_id(button_id)
 
         if button is None:
             return
 
-        button.value = button_state
-        button.state = ButtonState.ACTIVE if button_state > 0 else ButtonState.INACTIVE
+        await self._client.send(
+            BaseUpdate(
+                update=UpdateButton(
+                    button.id,
+                    ButtonState.ACTIVE if button_state > 0 else ButtonState.INACTIVE,
+                )
+            )
+        )
 
-        # 2024-12-03 20:06:46.449 DEBUG (MainThread) [homeassistant.components.bang_olufsen.websocket] {'event': {'type': 'status', 'state': 'error', 'message': 'homeautomationsystem::message::Update|homeautomationsystem::schema::Update::UpdateProperty [No oneof found] {"title":"das","subtitle":"ssd","value":100,"state":"active","content":{"icon":"butler"},"default":false,"id":"65482a7e-0556-42dc-b310-63ab3c4be841"}'}, 'device_id': '73a0dd7ea779f9d662b28c98e3c5113a', 'serial_number': 32786583}
-        await self._client.send(BaseUpdate(update=button))
-        # if state.state
-        # entity_registry = er.async_get(self.hass)
-        # <Event state_changed[L]: entity_id=sensor.beoremote_halo_32786583_battery_level, old_state=<state sensor.beoremote_halo_32786583_battery_level=unknown; state_class=measurement, unit_of_measurement=%, device_class=battery, friendly_name=Beoremote Halo-32786583 Battery level @ 2024-12-03T19:01:20.273815+01:00>, new_state=<state sensor.beoremote_halo_32786583_battery_level=100; state_class=measurement, unit_of_measurement=%, device_class=battery, friendly_name=Beoremote Halo-32786583 Battery level @ 2024-12-03T19:01:20.293381+01:00>>
-        # self._entity_registry.async_get(event.event_type)
+    async def _handle_button(self, event: HaloButtonEvent) -> None:
+        """Handle state change events of Sensor entities."""
+        if event.state == ButtonEventState.RELEASED:
+            return
+
+        await self.hass.services.async_call(
+            BUTTON_DOMAIN,
+            SERVICE_PRESS,
+            {ATTR_ENTITY_ID: self._entity_map[event.id]},
+        )
+        # try:
+        #     button_state = state.state
+        # except ValueError:
+        #     _LOGGER.error("Invalid state %s", state.state)
+        #     if state.state == "playing":
+        #         button_state = 1
+        #     else:
+        #         button_state = 0
+
+        # button = self._get_button_from_id(button_id)
+
+        # if button is None:
+        #     return
+
+        # await self._client.send(
+        #     BaseUpdate(
+        #         update=HaloButtonEvent(
+        #             button.id,
+        #             ButtonState.ACTIVE if button_state > 0 else ButtonState.INACTIVE,
+        #         )
+        #     )
+        # )
 
     def _update_connection_status(self) -> None:
         """Update all entities of the connection status."""
@@ -172,7 +212,6 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
         )
         if self._entry.options:
             configuration = self._entry.options[CONF_HALO]
-
         else:
             configuration = self._entry.data[CONF_HALO]
 
@@ -186,8 +225,10 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
         _LOGGER.error("Lost connection to the %s", self._entry.title)
         self._update_connection_status()
 
-    def on_button_event(self, event: ButtonEvent) -> None:
+    async def on_button_event(self, event: HaloButtonEvent) -> None:
         """Send halo_button dispatch."""
+        await self._handle_button(event=event)
+
         async_dispatcher_send(
             self.hass,
             f"{self._unique_id}_{WebsocketNotification.HALO_BUTTON}",

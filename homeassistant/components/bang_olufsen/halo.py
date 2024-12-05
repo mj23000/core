@@ -174,12 +174,22 @@ class ButtonEventState(StrEnum):
 
 
 @dataclass
+class UpdateButton(DataClassJSONMixin):
+    """UpdateButton."""
+
+    id: str
+    state: ButtonState = ButtonState.INACTIVE
+    value: int = 0
+    type: str = "button"
+
+
+@dataclass
 class ButtonEvent(DataClassJSONMixin):
     """ButtonEvent."""
 
-    type: str
     id: str
     state: ButtonEventState
+    type: str = "button"
 
 
 class PowerEventState(StrEnum):
@@ -273,7 +283,7 @@ class Notification(DataClassJSONMixin):
 class BaseUpdate(DataClassJSONMixin):
     """Base Update Class."""
 
-    update: Button | DisplayPage | Notification
+    update: UpdateButton | DisplayPage | Notification
 
 
 class Halo:
