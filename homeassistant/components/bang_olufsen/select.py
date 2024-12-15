@@ -12,20 +12,20 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import BangOlufsenMozartConfigEntry, set_platform_initialized
+from . import MozartConfigEntry, set_platform_initialized
 from .const import CONNECTION_STATUS, WebsocketNotification
-from .entity import BangOlufsenMozartEntity
+from .entity import MozartEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: BangOlufsenMozartConfigEntry,
+    config_entry: MozartConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Select entities from config entry."""
-    entities: list[BangOlufsenMozartEntity] = []
+    entities: list[MozartEntity] = []
 
     # Create the listening position entity if supported
     scenes = await config_entry.runtime_data.client.get_all_scenes()
@@ -42,10 +42,10 @@ async def async_setup_entry(
     set_platform_initialized(config_entry.runtime_data)
 
 
-class BangOlufsenSelect(BangOlufsenMozartEntity, SelectEntity):
+class BangOlufsenSelect(MozartEntity, SelectEntity):
     """Select for Mozart settings."""
 
-    def __init__(self, config_entry: BangOlufsenMozartConfigEntry) -> None:
+    def __init__(self, config_entry: MozartConfigEntry) -> None:
         """Init the Select."""
         super().__init__(config_entry)
 
@@ -59,7 +59,7 @@ class BangOlufsenSelectListeningPosition(BangOlufsenSelect):
 
     _attr_translation_key = "listening_position"
 
-    def __init__(self, config_entry: BangOlufsenMozartConfigEntry) -> None:
+    def __init__(self, config_entry: MozartConfigEntry) -> None:
         """Init the listening position select."""
         super().__init__(config_entry)
 

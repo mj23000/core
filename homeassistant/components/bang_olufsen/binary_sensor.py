@@ -12,18 +12,18 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import BangOlufsenMozartConfigEntry, set_platform_initialized
+from . import MozartConfigEntry, set_platform_initialized
 from .const import CONNECTION_STATUS, WebsocketNotification
-from .entity import BangOlufsenMozartEntity
+from .entity import MozartEntity
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: BangOlufsenMozartConfigEntry,
+    config_entry: MozartConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Binary Sensor entities from config entry."""
-    entities: list[BangOlufsenMozartEntity] = []
+    entities: list[MozartEntity] = []
 
     # Check if device has a battery
     battery_state = await config_entry.runtime_data.client.get_battery_state()
@@ -36,10 +36,10 @@ async def async_setup_entry(
     set_platform_initialized(config_entry.runtime_data)
 
 
-class BangOlufsenBinarySensor(BangOlufsenMozartEntity, BinarySensorEntity):
+class BangOlufsenBinarySensor(MozartEntity, BinarySensorEntity):
     """Base Binary Sensor class."""
 
-    def __init__(self, config_entry: BangOlufsenMozartConfigEntry) -> None:
+    def __init__(self, config_entry: MozartConfigEntry) -> None:
         """Init the Binary Sensor."""
         super().__init__(config_entry)
 
@@ -51,7 +51,7 @@ class BangOlufsenBinarySensorBatteryCharging(BangOlufsenBinarySensor):
 
     _attr_translation_key = "battery_charging"
 
-    def __init__(self, config_entry: BangOlufsenMozartConfigEntry) -> None:
+    def __init__(self, config_entry: MozartConfigEntry) -> None:
         """Init the battery charging Binary Sensor."""
         super().__init__(config_entry)
 

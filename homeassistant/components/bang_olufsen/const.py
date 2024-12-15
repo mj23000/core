@@ -21,6 +21,7 @@ from .halo import (
     Icon,
     Icons,
     Page,
+    SystemEventState,
 )
 
 
@@ -85,6 +86,7 @@ class BangOlufsenModel(StrEnum):
     BEOSOUND_LEVEL = "Beosound Level"
     BEOSOUND_THEATRE = "Beosound Theatre"
     BEOREMOTE_HALO = "Beoremote Halo"
+    BEOREMOTE_ONE = "Beoremote One"
 
 
 # Dispatcher events
@@ -142,6 +144,8 @@ DOMAIN: Final[str] = "bang_olufsen"
 # Default values for configuration.
 DEFAULT_MODEL: Final[str] = BangOlufsenModel.BEOSOUND_BALANCE
 
+MANUFACTURER: Final[str] = "Bang & Olufsen"
+
 # Configuration.
 CONF_BEOLINK_JID: Final = "jid"
 CONF_SERIAL_NUMBER: Final = "serial_number"
@@ -187,10 +191,18 @@ DEFAULT_HALO_CONFIGURATION = BaseConfiguration(
     )
 ).to_dict()
 
+# Mozart models
+MOZART_MODELS: Final[list[BangOlufsenModel]] = [
+    model
+    for model in BangOlufsenModel
+    if model.value
+    not in (BangOlufsenModel.BEOREMOTE_HALO, BangOlufsenModel.BEOREMOTE_ONE)
+]
+
 # Models to choose from in manual configuration.
-# The Halo can only be discovered, so should not be included here.
-COMPATIBLE_MODELS: list[str] = [
-    x.value for x in BangOlufsenModel if x.value != BangOlufsenModel.BEOREMOTE_HALO
+SELECTABLE_MODELS: Final[list[BangOlufsenModel]] = [
+    *MOZART_MODELS,
+    BangOlufsenModel.BEOREMOTE_HALO,
 ]
 
 
@@ -438,6 +450,8 @@ PROXIMITY_EVENTS: Final[list[str]] = [
     "proximity_presence_not_detected",
 ]
 
+HALO_SYSTEM_EVENTS: Final[list[str]] = list(SystemEventState)
+# HALO_SYSTEM_EVENTS: Final[list[str]] = list[SystemEventState]
 
 BEOLINK_LEADER_COMMAND: Final[str] = "BEOLINK_LEADER_COMMAND"
 BEOLINK_LISTENER_COMMAND: Final[str] = "BEOLINK_LISTENER_COMMAND"

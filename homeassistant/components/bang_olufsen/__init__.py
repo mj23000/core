@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from aiohttp import ClientConnectorError, ClientOSError, ServerTimeoutError
 from mozart_api.exceptions import ApiException
@@ -18,8 +19,8 @@ from homeassistant.util.ssl import get_default_context
 
 from .const import BEO_REMOTE_MODEL, DOMAIN
 from .halo import Halo
-from .util import get_remote, is_halo
-from .websocket import BangOlufsenHaloWebsocket, BangOlufsenMozartWebsocket
+from .util import get_remote, is_halo, is_mozart
+from .websocket import HaloWebsocket, MozartWebsocket
 
 MOZART_PLATFORMS = [
     Platform.BINARY_SENSOR,
@@ -30,51 +31,85 @@ MOZART_PLATFORMS = [
     Platform.TEXT,
 ]
 
-HALO_PLATFORMS = [Platform.SENSOR]
+HALO_PLATFORMS = [Platform.EVENT, Platform.SENSOR]
 
 
 @dataclass
-class BangOlufsenMozartData:
+class MozartData:
     """Dataclass for API client, WebSocket listener and WebSocket initialization variables."""
 
-    websocket: BangOlufsenMozartWebsocket
+    websocket: MozartWebsocket
     client: MozartClient
     platforms_initialized: int = 0
 
 
 @dataclass
-class BangOlufsenHaloData:
+class HaloData:
     """Dataclass for API client, WebSocket listener and WebSocket initialization variables."""
 
-    websocket: BangOlufsenHaloWebsocket
+    websocket: HaloWebsocket
     client: Halo
+    platforms_initialized: int = 0
 
 
-type BangOlufsenMozartConfigEntry = ConfigEntry[BangOlufsenMozartData]
-type BangOlufsenHaloConfigEntry = ConfigEntry[BangOlufsenHaloData]
+type MozartConfigEntry = ConfigEntry[MozartData]
+type HaloConfigEntry = ConfigEntry[HaloData]
 
 
-def set_platform_initialized(data: BangOlufsenMozartData) -> None:
+def set_platform_initialized(data: MozartData) -> None:
     """Increment platforms_initialized to indicate that a platform has been initialized."""
     data.platforms_initialized += 1
 
 
-async def _start_websocket_listener(data: BangOlufsenMozartData) -> None:
+async def _start_websocket_listener(
+    config_entry: HaloConfigEntry | MozartConfigEntry,
+    platforms: list[Platform],
+) -> None:
     """Start WebSocket listener when all platforms have been initialized."""
 
     while True:
         # Check if all platforms have been initialized and start WebSocket listener
-        if len(MOZART_PLATFORMS) == data.platforms_initialized:
+        if len(platforms) == config_entry.runtime_data.platforms_initialized:
             break
 
         await asyncio.sleep(0)
 
-    await data.client.connect_notifications(remote_control=True, reconnect=True)
+    if is_mozart(config_entry):
+        if TYPE_CHECKING:
+            assert isinstance(config_entry.runtime_data, MozartData)
+        await config_entry.runtime_data.client.connect_notifications(
+            remote_control=True, reconnect=True
+        )
+    else:
+        await config_entry.runtime_data.client.connect_notifications(reconnect=True)
 
 
-async def _setup_mozart(
-    hass: HomeAssistant, config_entry: BangOlufsenMozartConfigEntry
-) -> bool:
+async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+    """Set up from a config entry."""
+
+    # Remove casts to str
+    assert config_entry.unique_id
+
+    # Create device now as BangOlufsenWebsocket needs a device for debug logging, firing events etc.
+    # And in order to ensure entity platforms (button, binary_sensor) have device name before the primary (media_player) is initialized
+    device_registry = dr.async_get(hass)
+    device_registry.async_get_or_create(
+        config_entry_id=config_entry.entry_id,
+        identifiers={(DOMAIN, config_entry.unique_id)},
+        name=config_entry.title,
+        model=config_entry.data[CONF_MODEL],
+        serial_number=config_entry.unique_id,
+        manufacturer="Bang & Olufsen",
+    )
+
+    if is_halo(config_entry):
+        return await _setup_halo(hass, config_entry)
+
+    # Mozart based products
+    return await _setup_mozart(hass, config_entry)
+
+
+async def _setup_mozart(hass: HomeAssistant, config_entry: MozartConfigEntry) -> bool:
     """Set up a Mozart based product."""
     client = MozartClient(
         host=config_entry.data[CONF_HOST], ssl_context=get_default_context()
@@ -96,10 +131,10 @@ async def _setup_mozart(
         ) from error
 
     # Initialize coordinator
-    websocket = BangOlufsenMozartWebsocket(hass, config_entry, client)
+    websocket = MozartWebsocket(hass, config_entry, client)
 
     # Add the coordinator and API client
-    config_entry.runtime_data = BangOlufsenMozartData(websocket, client)
+    config_entry.runtime_data = MozartData(websocket, client)
 
     # Check for connected Beoremote One
     if remote := await get_remote(client):
@@ -137,16 +172,14 @@ async def _setup_mozart(
     # Start WebSocket connection when all entities have been initialized
     config_entry.async_create_background_task(
         hass,
-        _start_websocket_listener(config_entry.runtime_data),
-        f"{DOMAIN}-{config_entry.unique_id}-websocket_starter",
+        _start_websocket_listener(config_entry, MOZART_PLATFORMS),
+        f"{DOMAIN}-{config_entry.unique_id}-mozart-websocket_starter",
     )
 
     return True
 
 
-async def _setup_halo(
-    hass: HomeAssistant, config_entry: BangOlufsenHaloConfigEntry
-) -> bool:
+async def _setup_halo(hass: HomeAssistant, config_entry: HaloConfigEntry) -> bool:
     """Set up a Halo."""
     client = Halo(host=config_entry.data[CONF_HOST])
 
@@ -159,46 +192,26 @@ async def _setup_halo(
         ) from error
 
     # Initialize coordinator
-    websocket = BangOlufsenHaloWebsocket(hass, config_entry, client)
+    websocket = HaloWebsocket(hass, config_entry, client)
 
     # Add the coordinator and API client
-    config_entry.runtime_data = BangOlufsenHaloData(websocket, client)
+    config_entry.runtime_data = HaloData(websocket, client)
 
     await hass.config_entries.async_forward_entry_setups(config_entry, HALO_PLATFORMS)
 
-    await client.connect_notifications(reconnect=True)
+    # Start WebSocket connection when all entities have been initialized
+    config_entry.async_create_background_task(
+        hass,
+        _start_websocket_listener(config_entry, HALO_PLATFORMS),
+        f"{DOMAIN}-{config_entry.unique_id}-halo-websocket_starter",
+    )
 
     config_entry.async_on_unload(config_entry.add_update_listener(async_update_options))
 
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
-    """Set up from a config entry."""
-
-    # Remove casts to str
-    assert config_entry.unique_id
-
-    # Create device now as BangOlufsenWebsocket needs a device for debug logging, firing events etc.
-    # And in order to ensure entity platforms (button, binary_sensor) have device name before the primary (media_player) is initialized
-    device_registry = dr.async_get(hass)
-    device_registry.async_get_or_create(
-        config_entry_id=config_entry.entry_id,
-        identifiers={(DOMAIN, config_entry.unique_id)},
-        name=config_entry.title,
-        model=config_entry.data[CONF_MODEL],
-        serial_number=config_entry.unique_id,
-        manufacturer="Bang & Olufsen",
-    )
-
-    if is_halo(config_entry):
-        return await _setup_halo(hass, config_entry)
-
-    # Mozart based products
-    return await _setup_mozart(hass, config_entry)
-
-
-async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def async_update_options(hass: HomeAssistant, entry: HaloConfigEntry) -> None:
     """Update options."""
     await hass.config_entries.async_reload(entry.entry_id)
 
@@ -208,6 +221,8 @@ async def async_unload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
 
     # Close the API client and WebSocket notification listener
     if is_halo(config_entry):
+        if TYPE_CHECKING:
+            assert isinstance(config_entry.runtime_data, HaloData)
         await config_entry.runtime_data.client.disconnect_notifications()
         platforms = HALO_PLATFORMS
     else:

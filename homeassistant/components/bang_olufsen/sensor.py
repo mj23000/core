@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from abc import ABC
 import contextlib
 from datetime import timedelta
 from typing import cast
@@ -17,27 +18,16 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_MODEL
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import (
-    BangOlufsenHaloConfigEntry,
-    BangOlufsenMozartConfigEntry,
-    set_platform_initialized,
-)
-from .const import (
-    COMPATIBLE_MODELS,
-    CONNECTION_STATUS,
-    DOMAIN,
-    BangOlufsenModel,
-    WebsocketNotification,
-)
-from .entity import BangOlufsenHaloEntity, BangOlufsenMozartEntity
+from . import HaloConfigEntry, MozartConfigEntry, set_platform_initialized
+from .const import CONNECTION_STATUS, DOMAIN, WebsocketNotification
+from .entity import HaloEntity, MozartEntity
 from .halo import PowerEvent
-from .util import get_remote
+from .util import get_remote, is_halo
 
 SCAN_INTERVAL = timedelta(minutes=15)
 
@@ -48,35 +38,38 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Sensor entities from config entry."""
-    # Mozart based products
-    if config_entry.data[CONF_MODEL] in COMPATIBLE_MODELS:
-        await _setup_mozart(hass, config_entry, async_add_entities)
+    entities: list[BangOlufsenMozartSensor | BangOlufsenHaloSensor] = []
 
-    # Halo
-    elif config_entry.data[CONF_MODEL] == BangOlufsenModel.BEOREMOTE_HALO:
-        await _setup_halo(hass, config_entry, async_add_entities)
-
-
-async def _setup_halo(
-    hass: HomeAssistant,
-    config_entry: BangOlufsenHaloConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
-    """Set up Mozart Sensor entities from config entry."""
-    entities: list[BangOlufsenHaloEntity] = [
-        BangOlufsenSensorHaloBatteryLevel(config_entry)
-    ]
+    if is_halo(config_entry):
+        entities.extend(await _get_halo_entities(config_entry))
+    else:
+        entities.extend(await _get_mozart_entities(config_entry))
 
     async_add_entities(new_entities=entities)
 
+    set_platform_initialized(config_entry.runtime_data)
 
-async def _setup_mozart(
-    hass: HomeAssistant,
-    config_entry: BangOlufsenMozartConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
-    """Set up Mozart Sensor entities from config entry."""
-    entities: list[BangOlufsenMozartEntity] = [
+
+class BangOlufsenSensor(SensorEntity, ABC):
+    """Base Sensor class."""
+
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+
+# Mozart entities
+class BangOlufsenMozartSensor(MozartEntity, BangOlufsenSensor):
+    """Base Mozart Sensor class."""
+
+    def __init__(self, config_entry: MozartConfigEntry) -> None:
+        """Init the Sensor."""
+        super().__init__(config_entry)
+
+
+async def _get_mozart_entities(
+    config_entry: MozartConfigEntry,
+) -> list[BangOlufsenMozartSensor]:
+    """Get Mozart Sensor entities from config entry."""
+    entities: list[BangOlufsenMozartSensor] = [
         BangOlufsenSensorInputSignal(config_entry),
         BangOlufsenSensorMediaId(config_entry),
     ]
@@ -97,28 +90,16 @@ async def _setup_mozart(
     if remote := await get_remote(config_entry.runtime_data.client):
         entities.append(BangOlufsenSensorRemoteBatteryLevel(config_entry, remote))
 
-    async_add_entities(new_entities=entities)
-
-    set_platform_initialized(config_entry.runtime_data)
+    return entities
 
 
-class BangOlufsenSensor(BangOlufsenMozartEntity, SensorEntity):
-    """Base Sensor class."""
-
-    def __init__(self, config_entry: BangOlufsenMozartConfigEntry) -> None:
-        """Init the Sensor."""
-        super().__init__(config_entry)
-
-        self._attr_state_class = SensorStateClass.MEASUREMENT
-
-
-class BangOlufsenSensorBatteryLevel(BangOlufsenSensor):
+class BangOlufsenSensorBatteryLevel(BangOlufsenMozartSensor):
     """Battery level Sensor."""
 
     _attr_native_unit_of_measurement = "%"
     _attr_translation_key = "battery_level"
 
-    def __init__(self, config_entry: BangOlufsenMozartConfigEntry) -> None:
+    def __init__(self, config_entry: MozartConfigEntry) -> None:
         """Init the battery level Sensor."""
         super().__init__(config_entry)
 
@@ -148,53 +129,14 @@ class BangOlufsenSensorBatteryLevel(BangOlufsenSensor):
         self.async_write_ha_state()
 
 
-class BangOlufsenSensorHaloBatteryLevel(BangOlufsenHaloEntity, SensorEntity):
-    """Halo battery level Sensor."""
-
-    _attr_native_unit_of_measurement = "%"
-    _attr_translation_key = "halo_battery_level"
-    _attr_state_class = SensorStateClass.MEASUREMENT
-
-    def __init__(self, config_entry: BangOlufsenHaloConfigEntry) -> None:
-        """Init the battery level Sensor."""
-        super().__init__(config_entry)
-
-        self._attr_device_class = SensorDeviceClass.BATTERY
-        self._attr_unique_id = f"{self._unique_id}-battery-level"
-
-    async def async_added_to_hass(self) -> None:
-        """Turn on the dispatchers."""
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                f"{self._unique_id}_{CONNECTION_STATUS}",
-                self._async_update_connection_state,
-            )
-        )
-        self.async_on_remove(
-            async_dispatcher_connect(
-                self.hass,
-                f"{self._unique_id}_{WebsocketNotification.HALO_POWER}",
-                self._update_battery,
-            )
-        )
-
-    async def _update_battery(self, data: PowerEvent) -> None:
-        """Update sensor value."""
-        self._attr_native_value = data.capacity
-        self.async_write_ha_state()
-
-
-class BangOlufsenSensorRemoteBatteryLevel(BangOlufsenSensor):
+class BangOlufsenSensorRemoteBatteryLevel(BangOlufsenMozartSensor):
     """Battery level Sensor for the Beoremote One."""
 
     _attr_native_unit_of_measurement = "%"
     _attr_translation_key = "remote_battery_level"
     _attr_should_poll = True
 
-    def __init__(
-        self, config_entry: BangOlufsenMozartConfigEntry, remote: PairedRemote
-    ) -> None:
+    def __init__(self, config_entry: MozartConfigEntry, remote: PairedRemote) -> None:
         """Init the battery level Sensor."""
         super().__init__(config_entry)
         assert remote.serial_number
@@ -218,14 +160,14 @@ class BangOlufsenSensorRemoteBatteryLevel(BangOlufsenSensor):
                 self._attr_native_value = remote.battery_level
 
 
-class BangOlufsenSensorBatteryChargingTime(BangOlufsenSensor):
+class BangOlufsenSensorBatteryChargingTime(BangOlufsenMozartSensor):
     """Battery charging time Sensor."""
 
     _attr_entity_registry_enabled_default = False
     _attr_native_unit_of_measurement = "min"
     _attr_translation_key = "battery_charging_time"
 
-    def __init__(self, config_entry: BangOlufsenMozartConfigEntry) -> None:
+    def __init__(self, config_entry: MozartConfigEntry) -> None:
         """Init the battery charging time Sensor."""
         super().__init__(config_entry)
 
@@ -266,14 +208,14 @@ class BangOlufsenSensorBatteryChargingTime(BangOlufsenSensor):
         self.async_write_ha_state()
 
 
-class BangOlufsenSensorBatteryPlayingTime(BangOlufsenSensor):
+class BangOlufsenSensorBatteryPlayingTime(BangOlufsenMozartSensor):
     """Battery playing time Sensor."""
 
     _attr_entity_registry_enabled_default = False
     _attr_native_unit_of_measurement = "min"
     _attr_translation_key = "battery_playing_time"
 
-    def __init__(self, config_entry: BangOlufsenMozartConfigEntry) -> None:
+    def __init__(self, config_entry: MozartConfigEntry) -> None:
         """Init the battery playing time Sensor."""
         super().__init__(config_entry)
 
@@ -312,18 +254,18 @@ class BangOlufsenSensorBatteryPlayingTime(BangOlufsenSensor):
         self.async_write_ha_state()
 
 
-class BangOlufsenSensorMediaId(BangOlufsenSensor):
+class BangOlufsenSensorMediaId(BangOlufsenMozartSensor):
     """Media id Sensor."""
 
     _attr_entity_registry_enabled_default = False
     _attr_translation_key = "media_id"
 
-    def __init__(self, config_entry: BangOlufsenMozartConfigEntry) -> None:
+    def __init__(self, config_entry: MozartConfigEntry) -> None:
         """Init the media id Sensor."""
         super().__init__(config_entry)
 
         self._attr_device_class = None
-        self._attr_state_class = None
+        # self._attr_state_class = None
         self._attr_native_value = None
         self._attr_unique_id = f"{self._unique_id}-media-id"
 
@@ -350,18 +292,18 @@ class BangOlufsenSensorMediaId(BangOlufsenSensor):
         self.async_write_ha_state()
 
 
-class BangOlufsenSensorInputSignal(BangOlufsenSensor):
+class BangOlufsenSensorInputSignal(BangOlufsenMozartSensor):
     """Input signal Sensor."""
 
     _attr_entity_registry_enabled_default = False
     _attr_translation_key = "input_signal"
 
-    def __init__(self, config_entry: BangOlufsenMozartConfigEntry) -> None:
+    def __init__(self, config_entry: MozartConfigEntry) -> None:
         """Init the input signal Sensor."""
         super().__init__(config_entry)
 
         self._attr_device_class = None
-        self._attr_state_class = None
+        # self._attr_state_class = None
         self._attr_unique_id = f"{self._unique_id}-input-signal"
 
     async def async_added_to_hass(self) -> None:
@@ -399,4 +341,62 @@ class BangOlufsenSensorInputSignal(BangOlufsenSensor):
         else:
             self._attr_native_value = None
 
+        self.async_write_ha_state()
+
+
+# Halo entities
+
+
+async def _get_halo_entities(
+    config_entry: HaloConfigEntry,
+) -> list[BangOlufsenHaloSensor]:
+    """Get Halo Sensor entities from config entry."""
+    entities: list[BangOlufsenHaloSensor] = [
+        BangOlufsenSensorHaloBatteryLevel(config_entry)
+    ]
+    return entities
+
+
+class BangOlufsenHaloSensor(HaloEntity, BangOlufsenSensor):
+    """Base Halo Sensor class."""
+
+    def __init__(self, config_entry: HaloConfigEntry) -> None:
+        """Init the Sensor."""
+        super().__init__(config_entry)
+
+
+class BangOlufsenSensorHaloBatteryLevel(BangOlufsenHaloSensor):
+    """Halo battery level Sensor."""
+
+    _attr_native_unit_of_measurement = "%"
+    _attr_translation_key = "halo_battery_level"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, config_entry: HaloConfigEntry) -> None:
+        """Init the battery level Sensor."""
+        super().__init__(config_entry)
+
+        self._attr_device_class = SensorDeviceClass.BATTERY
+        self._attr_unique_id = f"{self._unique_id}-battery-level"
+
+    async def async_added_to_hass(self) -> None:
+        """Turn on the dispatchers."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{self._unique_id}_{CONNECTION_STATUS}",
+                self._async_update_connection_state,
+            )
+        )
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                f"{self._unique_id}_{WebsocketNotification.HALO_POWER}",
+                self._update_battery,
+            )
+        )
+
+    async def _update_battery(self, data: PowerEvent) -> None:
+        """Update sensor value."""
+        self._attr_native_value = data.capacity
         self.async_write_ha_state()

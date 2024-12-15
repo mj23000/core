@@ -39,7 +39,6 @@ from .const import (
     ATTR_ITEM_NUMBER,
     ATTR_MOZART_SERIAL_NUMBER,
     ATTR_TYPE_NUMBER,
-    COMPATIBLE_MODELS,
     CONF_ENTITY_MAP,
     CONF_HALO,
     CONF_PAGE_NAME,
@@ -54,6 +53,7 @@ from .const import (
     HALO_BUTTON_ICONS,
     HALO_TEXT_LENGTH,
     HALO_TITLE_LENGTH,
+    SELECTABLE_MODELS,
     ZEROCONF_HALO,
     ZEROCONF_MOZART,
     BangOlufsenModel,
@@ -76,11 +76,12 @@ class BangOlufsenEntryData(TypedDict, total=False):
     """TypedDict for config_entry data."""
 
     host: str
-    jid: str
     model: str
     name: str
+    # Mozart
+    jid: str
+    # Halo
     # Does not seem to handle objects well through restarts
-    # halo: BaseConfiguration
     halo: dict
     entity_map: dict[str, str]
 
@@ -118,7 +119,7 @@ class BangOlufsenConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_HOST): str,
                 vol.Required(CONF_MODEL, default=DEFAULT_MODEL): SelectSelector(
-                    SelectSelectorConfig(options=COMPATIBLE_MODELS)
+                    SelectSelectorConfig(options=SELECTABLE_MODELS)
                 ),
             }
         )
@@ -453,6 +454,8 @@ class HaloOptionsFlowHandler(OptionsFlow):
                 }
             ),
         )
+
+    # Add a default button configuration page
 
     # TO DO add modify pages/buttons steps
 

@@ -2,20 +2,19 @@
 
 import asyncio
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 import contextlib
 from dataclasses import dataclass
 from enum import StrEnum
 import json
 import logging
-from typing import Literal, cast
+from typing import Literal, TypedDict, cast
 from uuid import uuid4
 
 from aiohttp import (
     ClientSession,
     ClientTimeout,
     ClientWebSocketResponse,
-    ClientWSTimeout,
     WSMessageTypeError,
 )
 from aiohttp.client_exceptions import (
@@ -286,6 +285,17 @@ class BaseUpdate(DataClassJSONMixin):
     update: UpdateButton | DisplayPage | Notification
 
 
+class BaseWebSocketResponse(TypedDict):
+    """Base class for serialized WebSocket notifications."""
+
+    event: dict
+
+
+WebSocketEventType = type[
+    WheelEvent | SystemEvent | StatusEvent | PowerEvent | ButtonEvent
+]
+
+
 class Halo:
     """User friendly Mozart REST API and WebSocket client."""
 
@@ -298,56 +308,74 @@ class Halo:
         self._websocket_listener_active = False
         self._websocket_task: asyncio.Task
         self._websocket: ClientWebSocketResponse
-        self._on_connection_lost: Callable | None = None
-        self._on_connection: Callable | None = None
+        self._on_connection_lost: Callable[[None], Awaitable[None] | None] | None = None
+        self._on_connection: Callable[[None], Awaitable[None] | None] | None = None
 
         self._on_all_notifications: Callable | None = None
         self._on_all_notifications_raw: Callable | None = None
+
+        # self._on_all_notifications: (
+        #     Callable[[WebSocketEventType, str], Awaitable[None] | None] | None
+        # ) = None
+        # self._on_all_notifications_raw: (
+        #     Callable[[BaseWebSocketResponse], Awaitable[None] | None] | None
+        # ) = None
 
         self._notification_callbacks: dict[str, Callable | None] = defaultdict()
         self._notification_callbacks.default_factory = lambda: None
 
     async def _check_websocket_connection(
         self,
-    ) -> Literal[True] | ClientConnectorError | ClientOSError | ServerTimeoutError:
+    ) -> (
+        Literal[True]
+        | ClientConnectorError
+        | ClientOSError
+        | ServerTimeoutError
+        | WSMessageTypeError
+    ):
         """Check if a connection can be made to the device's WebSocket notification channel."""
         try:
             async with (
                 ClientSession(
                     timeout=ClientTimeout(connect=WEBSOCKET_TIMEOUT)
                 ) as session,
-                session.ws_connect(
-                    f"ws://{self.host}:8080/",
-                    timeout=ClientWSTimeout(ws_receive=WEBSOCKET_TIMEOUT),
-                ) as websocket,
+                session.ws_connect(f"ws://{self.host}:8080/") as websocket,
             ):
                 if await websocket.receive():
                     return True
 
-        except (ClientConnectorError, ClientOSError, ServerTimeoutError) as error:
+        except (
+            ClientConnectorError,
+            ClientOSError,
+            ServerTimeoutError,
+            WSMessageTypeError,
+        ) as error:
             return error
 
     def check_current_websocket_connection(self) -> bool:
         """Check if there is currently a WebSocket connection open."""
-        # try:
         return not self._websocket.closed
-
-        # except (ClientConnectorError, ClientOSError, ServerTimeoutError) as error:
-        #     raise error
 
     async def check_device_connection(self, raise_error: bool = False) -> bool:
         """Check WebSocket connection."""
         # Don't use a taskgroup as both tasks should always be checked
-        task: asyncio.Task[
-            Literal[True] | ClientConnectorError | ClientOSError | ServerTimeoutError
-        ] = asyncio.create_task(self._check_websocket_connection(), name="websocket")
+        errors: tuple[
+            Literal[True]
+            | ClientConnectorError
+            | ClientOSError
+            | ServerTimeoutError
+            | WSMessageTypeError
+        ] = await asyncio.gather(  # type: ignore[assignment]
+            self._check_websocket_connection(), return_exceptions=True
+        )
+        # homeassistant/components/bang_olufsen/halo.py:365: error: Incompatible types in assignment
+        # (expression has type "tuple[Literal[True] | ClientOSError | ServerTimeoutError | WSMessageTypeError | BaseException]",
+        #    variable has type "tuple[Literal[True] | ClientConnectorError | ClientOSError | ServerTimeoutError | WSMessageTypeError]")  [assignment]
 
-        # Wait for tasks to complete
-        while not task.done():
-            await asyncio.sleep(0)
+        result = errors[0]
 
         # Check status
-        if (result := task.result()) is not True:
+        if result is not True:
             if raise_error:
                 raise result
             return False
@@ -391,14 +419,9 @@ class Halo:
 
                     while self._websocket_listener_active:
                         with contextlib.suppress(asyncio.TimeoutError):
-                            notification = await asyncio.wait_for(
-                                self._websocket.receive_str(),
-                                timeout=WEBSOCKET_TIMEOUT,
+                            notification = await self._websocket.receive_str(
+                                timeout=WEBSOCKET_TIMEOUT
                             )
-
-                            # Ensure that any notifications received after the disconnect command has been executed are not processed
-                            # if not self._websocket_listener_active:
-                            #     break
 
                             await self._on_message(notification)
 
@@ -458,7 +481,7 @@ class Halo:
         if self._on_all_notifications:
             await self._trigger_callback(
                 self._on_all_notifications,
-                deserialized_data,
+                deserialized_data,  # type: ignore[arg-type]
                 underscore(deserialized_data.type),
             )
 
@@ -471,12 +494,12 @@ class Halo:
         triggered_notification = self._notification_callbacks[deserialized_data.type]
 
         if triggered_notification:
-            await self._trigger_callback(triggered_notification, deserialized_data)
+            await self._trigger_callback(triggered_notification, deserialized_data)  # type: ignore[arg-type]
 
     async def _trigger_callback(
         self,
         callback: Callable,
-        *args: str | WheelEvent | SystemEvent | StatusEvent | PowerEvent | ButtonEvent,
+        *args: BaseWebSocketResponse | dict | str | WebSocketEventType,
     ) -> None:
         """Trigger async or sync callback correctly."""
         if asyncio.iscoroutinefunction(callback):
@@ -492,31 +515,51 @@ class Halo:
         """Call back for WebSocket connection."""
         self._on_connection = on_connection
 
-    def get_all_notifications(self, on_all_notifications: Callable) -> None:
+    def get_all_notifications(
+        self,
+        on_all_notifications: Callable[
+            [WebSocketEventType, str], Awaitable[None] | None
+        ],
+    ) -> None:
         """Call back for all notifications."""
         self._on_all_notifications = on_all_notifications
 
-    def get_all_notifications_raw(self, on_all_notifications_raw: Callable) -> None:
+    def get_all_notifications_raw(
+        self,
+        on_all_notifications_raw: Callable[
+            [BaseWebSocketResponse], Awaitable[None] | None
+        ],
+    ) -> None:
         """Call back for all notifications as dict."""
         self._on_all_notifications_raw = on_all_notifications_raw
 
-    def get_wheel_event(self, on_wheel_event: Callable) -> None:
+    def get_wheel_event(
+        self, on_wheel_event: Callable[[WheelEvent], Awaitable[None] | None]
+    ) -> None:
         """Call back for WheelEvent."""
         self._notification_callbacks["wheel"] = on_wheel_event
 
-    def get_system_event(self, on_system_event: Callable) -> None:
+    def get_system_event(
+        self, on_system_event: Callable[[SystemEvent], Awaitable[None] | None]
+    ) -> None:
         """Call back for SystemEvent."""
         self._notification_callbacks["system"] = on_system_event
 
-    def get_status_event(self, on_status_event: Callable) -> None:
+    def get_status_event(
+        self, on_status_event: Callable[[StatusEvent], Awaitable[None] | None]
+    ) -> None:
         """Call back for StatusEvent."""
         self._notification_callbacks["status"] = on_status_event
 
-    def get_power_event(self, on_power_event: Callable) -> None:
+    def get_power_event(
+        self, on_power_event: Callable[[PowerEvent], Awaitable[None] | None]
+    ) -> None:
         """Call back for PowerEvent."""
         self._notification_callbacks["power"] = on_power_event
 
-    def get_button_event(self, on_button_event: Callable) -> None:
+    def get_button_event(
+        self, on_button_event: Callable[[ButtonEvent], Awaitable[None] | None]
+    ) -> None:
         """Call back for ButtonEvent."""
         self._notification_callbacks["button"] = on_button_event
 

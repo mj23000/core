@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from mozart_api.models import (
     BatteryState,
@@ -19,12 +20,14 @@ from mozart_api.models import (
     VolumeState,
     WebsocketNotificationTag,
 )
-from mozart_api.mozart_client import MozartClient
+from mozart_api.mozart_client import BaseWebSocketResponse, MozartClient
 
 from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, SERVICE_PRESS
+from homeassistant.components.input_button import DOMAIN as INPUT_BUTTON_DOMAIN
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_ENTITY_ID, CONF_ENTITY_ID, Platform
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_track_state_change_event
@@ -39,10 +42,11 @@ from .const import (
     EVENT_TRANSLATION_MAP,
     WebsocketNotification,
 )
-from .entity import BangOlufsenHaloBase, BangOlufsenMozartBase
+from .entity import HaloBase, MozartBase
 from .halo import (
     BaseConfiguration,
     BaseUpdate,
+    BaseWebSocketResponse as HaloBaseWebSocketResponse,
     Button,
     ButtonEvent as HaloButtonEvent,
     ButtonEventState,
@@ -58,7 +62,7 @@ from .halo import (
 _LOGGER = logging.getLogger(__name__)
 
 
-class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
+class HaloWebsocket(HaloBase):
     """WebSocket for Halo."""
 
     def __init__(
@@ -75,6 +79,9 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
         self._entity_registry = er.async_get(self.hass)
         self._entity_map: dict[str, str] = {}
         self._configuration: BaseConfiguration | None = None
+
+        if TYPE_CHECKING:
+            assert isinstance(self._client, Halo)
 
         self._client.get_button_event(self.on_button_event)
         self._client.get_on_connection_lost(self.on_connection_lost)
@@ -164,15 +171,27 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
         )
 
     async def _handle_button(self, event: HaloButtonEvent) -> None:
-        """Handle state change events of Sensor entities."""
+        """Handle state change events of Button entities."""
+
         if event.state == ButtonEventState.RELEASED:
             return
 
-        await self.hass.services.async_call(
-            BUTTON_DOMAIN,
-            SERVICE_PRESS,
-            {ATTR_ENTITY_ID: self._entity_map[event.id]},
+        entity_id = self._entity_map[event.id]
+        domain = (
+            INPUT_BUTTON_DOMAIN
+            if entity_id.startswith(INPUT_BUTTON_DOMAIN)
+            else BUTTON_DOMAIN
         )
+
+        try:
+            await self.hass.services.async_call(
+                domain,
+                SERVICE_PRESS,
+                {ATTR_ENTITY_ID: entity_id},
+            )
+            # logging.warning("Pressing button for %s", entity_id)
+        except HomeAssistantError:
+            logging.exception("Error triggering %s", entity_id)
         # try:
         #     button_state = state.state
         # except ValueError:
@@ -267,17 +286,19 @@ class BangOlufsenHaloWebsocket(BangOlufsenHaloBase):
             event,
         )
 
-    def on_all_notifications_raw(self, event: dict) -> None:
-        """Receive all notifications."""
-        # Add the device_id and serial_number to the notification
-        event["device_id"] = self._device.id
-        event["serial_number"] = int(self._unique_id)
+    def on_all_notifications_raw(self, event: HaloBaseWebSocketResponse) -> None:
+        """Receive all events."""
+        debug_event = {
+            "device_id": self._device.id,
+            "serial_number": int(self._unique_id),
+            **event,
+        }
 
-        _LOGGER.debug("%s", event)
-        self.hass.bus.async_fire(BANG_OLUFSEN_HALO_WEBSOCKET_EVENT, event)
+        _LOGGER.debug("%s", debug_event)
+        self.hass.bus.async_fire(BANG_OLUFSEN_HALO_WEBSOCKET_EVENT, debug_event)
 
 
-class BangOlufsenMozartWebsocket(BangOlufsenMozartBase):
+class MozartWebsocket(MozartBase):
     """WebSocket listener(s) for Mozart products."""
 
     def __init__(
@@ -291,6 +312,9 @@ class BangOlufsenMozartWebsocket(BangOlufsenMozartBase):
 
         self.hass = hass
         self._device = self.get_device(hass, self._unique_id)
+
+        if TYPE_CHECKING:
+            assert isinstance(self._client, MozartClient)
 
         # WebSocket callbacks
         self._client.get_active_listening_mode_notifications(
@@ -515,12 +539,14 @@ class BangOlufsenMozartWebsocket(BangOlufsenMozartBase):
                 sw_version=software_status.software_version,
             )
 
-    def on_all_notifications_raw(self, notification: dict) -> None:
+    def on_all_notifications_raw(self, notification: BaseWebSocketResponse) -> None:
         """Receive all notifications."""
 
-        # Add the device_id and serial_number to the notification
-        notification["device_id"] = self._device.id
-        notification["serial_number"] = int(self._unique_id)
+        debug_notification = {
+            "device_id": self._device.id,
+            "serial_number": int(self._unique_id),
+            **notification,
+        }
 
-        _LOGGER.debug("%s", notification)
-        self.hass.bus.async_fire(BANG_OLUFSEN_WEBSOCKET_EVENT, notification)
+        _LOGGER.debug("%s", debug_notification)
+        self.hass.bus.async_fire(BANG_OLUFSEN_WEBSOCKET_EVENT, debug_notification)

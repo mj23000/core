@@ -10,18 +10,18 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import BangOlufsenMozartConfigEntry, set_platform_initialized
+from . import MozartConfigEntry, set_platform_initialized
 from .const import CONNECTION_STATUS, MODEL_SUPPORT_HOME_CONTROL, MODEL_SUPPORT_MAP
-from .entity import BangOlufsenMozartEntity
+from .entity import MozartEntity
 
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    config_entry: BangOlufsenMozartConfigEntry,
+    config_entry: MozartConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Text entities from config entry."""
-    entities: list[BangOlufsenMozartEntity] = []
+    entities: list[BangOlufsenText] = []
 
     # Add the Home Control URI entity if the device supports it
     if config_entry.data[CONF_MODEL] in MODEL_SUPPORT_MAP[MODEL_SUPPORT_HOME_CONTROL]:
@@ -32,10 +32,10 @@ async def async_setup_entry(
     set_platform_initialized(config_entry.runtime_data)
 
 
-class BangOlufsenText(TextEntity, BangOlufsenMozartEntity):
+class BangOlufsenText(TextEntity, MozartEntity):
     """Base Text class."""
 
-    def __init__(self, config_entry: BangOlufsenMozartConfigEntry) -> None:
+    def __init__(self, config_entry: MozartConfigEntry) -> None:
         """Init the Text."""
         super().__init__(config_entry)
 
@@ -48,7 +48,7 @@ class BangOlufsenTextHomeControlUri(BangOlufsenText):
     _attr_entity_registry_enabled_default = False
     _attr_translation_key = "home_control_uri"
 
-    def __init__(self, config_entry: BangOlufsenMozartConfigEntry) -> None:
+    def __init__(self, config_entry: MozartConfigEntry) -> None:
         """Init the Home Control URI Text."""
         super().__init__(config_entry)
 

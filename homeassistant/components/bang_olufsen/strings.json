@@ -186,6 +186,18 @@
       }
     },
     "event": {
+      "halo_system": {
+        "name": "System status",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "active": "Active",
+              "standby": "Standby",
+              "sleep": "Sleeping"
+            }
+          }
+        }
+      },
       "bluetooth": {
         "name": "Bluetooth",
         "state_attributes": {

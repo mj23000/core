@@ -10,7 +10,7 @@ from mozart_api.mozart_client import MozartClient
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_MODEL
 
-from .const import BangOlufsenModel
+from .const import MOZART_MODELS, BangOlufsenModel
 
 
 def get_serial_number_from_jid(jid: str) -> str:
@@ -22,6 +22,14 @@ def is_halo(config_entry: ConfigEntry) -> bool:
     """Return if device is a Halo."""
 
     if config_entry.data[CONF_MODEL] == BangOlufsenModel.BEOREMOTE_HALO:
+        return True
+    return False
+
+
+def is_mozart(config_entry: ConfigEntry) -> bool:
+    """Return if device is Mozart based."""
+
+    if config_entry.data[CONF_MODEL] in MOZART_MODELS:
         return True
     return False
 

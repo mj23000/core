@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from abc import ABC
 from typing import cast
 
 from mozart_api.models import (
@@ -36,11 +37,12 @@ from .const import DOMAIN
 from .halo import Halo
 
 
-class BangOlufsenBase:
-    """Base class for BangOlufsen Home Assistant objects."""
+class _BangOlufsenBase(ABC):
+    """Base class for Bang & Olufsen Home Assistant objects."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize the object."""
+
         # Get the input from the config entry.
         # Use _entry instead of config_entry to avoid conflicts with Home Assistant classes such as DataUpdateCoordinator.
         self._entry = config_entry
@@ -59,23 +61,23 @@ class BangOlufsenBase:
         return device
 
 
-class BangOlufsenMozartBase(BangOlufsenBase):
-    """Base class for Mozart BangOlufsen Home Assistant objects."""
+class MozartBase(_BangOlufsenBase):
+    """Base class for Mozart."""
 
     def __init__(
         self, config_entry: ConfigEntry, client: MozartClient | None = None
     ) -> None:
-        """Initialize the object."""
+        """Initialize Mozart specific variables."""
         super().__init__(config_entry)
 
-        # Set the MozartClient.
+        # Set the API Client.
         # Allowing the client to be set directly allows the coordinator to be initialized before being added to runtime_data.
         if client:
             self._client = client
         else:
             self._client = config_entry.runtime_data.client
 
-        # Objects that get directly updated by notifications.
+        # Objects that get directly updated by Mozart notifications.
         self._active_listening_mode = ListeningModeProps()
         self._active_speaker_group = SpeakerGroupOverview(
             friendly_name="", id="", is_deleteable=False
@@ -98,14 +100,14 @@ class BangOlufsenMozartBase(BangOlufsenBase):
         )
 
 
-class BangOlufsenHaloBase(BangOlufsenBase):
-    """Base class for Halo BangOlufsen Home Assistant objects."""
+class HaloBase(_BangOlufsenBase):
+    """Base class for Mozart."""
 
     def __init__(self, config_entry: ConfigEntry, client: Halo | None = None) -> None:
-        """Initialize the object."""
+        """Initialize Mozart specific variables."""
         super().__init__(config_entry)
 
-        # Set the Halo.
+        # Set the API Client.
         # Allowing the client to be set directly allows the coordinator to be initialized before being added to runtime_data.
         if client:
             self._client = client
@@ -113,8 +115,8 @@ class BangOlufsenHaloBase(BangOlufsenBase):
             self._client = config_entry.runtime_data.client
 
 
-class BangOlufsenHaloEntity(Entity, BangOlufsenHaloBase):
-    """Base Entity for BangOlufsen entities."""
+class MozartEntity(Entity, MozartBase):
+    """Base Entity for Bang & Olufsen Mozart entities."""
 
     _attr_has_entity_name = True
     _attr_should_poll = False
@@ -133,8 +135,8 @@ class BangOlufsenHaloEntity(Entity, BangOlufsenHaloBase):
         self.async_write_ha_state()
 
 
-class BangOlufsenMozartEntity(Entity, BangOlufsenMozartBase):
-    """Base Entity for BangOlufsen entities."""
+class HaloEntity(Entity, HaloBase):
+    """Base Entity for Bang & Olufsen Halo entities."""
 
     _attr_has_entity_name = True
     _attr_should_poll = False
