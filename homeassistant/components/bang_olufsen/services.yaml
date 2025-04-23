@@ -66,6 +66,40 @@ beolink_join:
                 - aux_a
                 - ph
 
+beolink_leader_command:
+  target:
+    entity:
+      integration: bang_olufsen
+      domain: media_player
+    device:
+      integration: bang_olufsen
+  fields:
+    command:
+      required: true
+      example: "set_volume_level"
+      selector:
+        select:
+          options:
+            - "media_next_track"
+            - "media_pause"
+            - "media_play_pause"
+            - "media_play"
+            - "media_previous_track"
+            - "media_seek"
+            - "media_stop"
+            - "mute_volume"
+            - "select_source"
+            - "set_relative_volume_level"
+            - "set_volume_level"
+            - "toggle"
+            - "volume_down"
+            - "volume_up"
+    parameter:
+      required: false
+      example: 0.4
+      selector:
+        text:
+
 beolink_leave:
   target:
     entity:
@@ -73,6 +107,34 @@ beolink_leave:
       domain: media_player
     device:
       integration: bang_olufsen
+
+beolink_set_relative_volume:
+  target:
+    entity:
+      integration: bang_olufsen
+      domain: media_player
+    device:
+      integration: bang_olufsen
+  fields:
+    volume_level:
+      required: true
+      example: 0.2
+      selector:
+        text:
+
+beolink_set_volume:
+  target:
+    entity:
+      integration: bang_olufsen
+      domain: media_player
+    device:
+      integration: bang_olufsen
+  fields:
+    volume_level:
+      required: true
+      example: 0.4
+      selector:
+        text:
 
 beolink_unexpand:
   target:
@@ -94,3 +156,29 @@ beolink_unexpand:
             ]
           selector:
             object:
+
+reboot:
+  target:
+    device:
+      integration: bang_olufsen
+
+halo_configuration:
+  target:
+    device:
+      integration: bang_olufsen
+
+halo_notification:
+  target:
+    device:
+      integration: bang_olufsen
+  fields:
+    title:
+      required: true
+      example: "Test notification title"
+      selector:
+        text:
+    subtitle:
+      required: true
+      example: "Test notification subtitle"
+      selector:
+        text:

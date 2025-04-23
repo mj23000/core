@@ -3,19 +3,34 @@
 import logging
 from unittest.mock import AsyncMock, Mock
 
-from mozart_api.models import SoftwareUpdateState
+from mozart_api.models import (
+    PairedRemote,
+    PairedRemoteResponse,
+    SoftwareUpdateState,
+    WebsocketNotificationTag,
+)
 import pytest
+from pytest_unordered import unordered
+from syrupy.assertion import SnapshotAssertion
 
 from homeassistant.components.bang_olufsen.const import (
-    BANG_OLUFSEN_WEBSOCKET_EVENT,
     CONNECTION_STATUS,
     DOMAIN,
+    MOZART_WEBSOCKET_EVENT,
+    WebsocketNotification,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceRegistry
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.entity_registry import EntityRegistry
 
-from .const import TEST_NAME
+from .const import (
+    TEST_NAME,
+    TEST_REMOTE_SERIAL,
+    TEST_REMOTE_SERIAL_PAIRED,
+    TEST_SERIAL_NUMBER,
+)
+from .util import get_balance_entity_ids, get_remote_entity_ids
 
 from tests.common import MockConfigEntry
 
@@ -23,17 +38,14 @@ from tests.common import MockConfigEntry
 async def test_connection(
     hass: HomeAssistant,
     caplog: pytest.LogCaptureFixture,
-    mock_config_entry: MockConfigEntry,
-    mock_mozart_client: AsyncMock,
+    integration: tuple[MockConfigEntry, AsyncMock],
 ) -> None:
     """Test on_connection and on_connection_lost logs and calls correctly."""
+    config_entry, client = integration
 
-    mock_mozart_client.websocket_connected = True
+    client.websocket_connected = True
 
-    mock_config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(mock_config_entry.entry_id)
-
-    connection_callback = mock_mozart_client.get_on_connection.call_args[0][0]
+    connection_callback = client.get_on_connection.call_args[0][0]
 
     caplog.set_level(logging.DEBUG)
 
@@ -41,7 +53,7 @@ async def test_connection(
 
     async_dispatcher_connect(
         hass,
-        f"{mock_config_entry.unique_id}_{CONNECTION_STATUS}",
+        f"{config_entry.unique_id}_{CONNECTION_STATUS}",
         mock_connection_callback,
     )
 
@@ -56,21 +68,18 @@ async def test_connection(
 async def test_connection_lost(
     hass: HomeAssistant,
     caplog: pytest.LogCaptureFixture,
-    mock_config_entry: MockConfigEntry,
-    mock_mozart_client: AsyncMock,
+    integration: tuple[MockConfigEntry, AsyncMock],
 ) -> None:
     """Test on_connection_lost logs and calls correctly."""
+    config_entry, client = integration
 
-    mock_config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(mock_config_entry.entry_id)
-
-    connection_lost_callback = mock_mozart_client.get_on_connection_lost.call_args[0][0]
+    connection_lost_callback = client.get_on_connection_lost.call_args[0][0]
 
     mock_connection_lost_callback = Mock()
 
     async_dispatcher_connect(
         hass,
-        f"{mock_config_entry.unique_id}_{CONNECTION_STATUS}",
+        f"{config_entry.unique_id}_{CONNECTION_STATUS}",
         mock_connection_lost_callback,
     )
 
@@ -84,16 +93,13 @@ async def test_connection_lost(
 async def test_on_software_update_state(
     hass: HomeAssistant,
     device_registry: DeviceRegistry,
-    mock_config_entry: MockConfigEntry,
-    mock_mozart_client: AsyncMock,
+    integration: tuple[MockConfigEntry, AsyncMock],
 ) -> None:
     """Test software version is updated through on_software_update_state."""
-
-    mock_config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    config_entry, client = integration
 
     software_update_state_callback = (
-        mock_mozart_client.get_software_update_state_notifications.call_args[0][0]
+        client.get_software_update_state_notifications.call_args[0][0]
     )
 
     # Trigger the notification
@@ -101,30 +107,205 @@ async def test_on_software_update_state(
 
     await hass.async_block_till_done()
 
-    assert mock_config_entry.unique_id
+    assert config_entry.unique_id
     assert (
         device := device_registry.async_get_device(
-            identifiers={(DOMAIN, mock_config_entry.unique_id)}
+            identifiers={(DOMAIN, config_entry.unique_id)}
         )
     )
     assert device.sw_version == "1.0.0"
+
+
+async def test_on_remote_control_already_added(
+    hass: HomeAssistant,
+    device_registry: DeviceRegistry,
+    entity_registry: EntityRegistry,
+    integration: tuple[MockConfigEntry, AsyncMock],
+    snapshot: SnapshotAssertion,
+) -> None:
+    """Test that the integration does nothing when a remote that already has a device triggers a check."""
+    config_entry, client = integration
+
+    # Check device and API call count
+    assert client.get_bluetooth_remotes.call_count == 3
+    assert device_registry.async_get_device({(DOMAIN, TEST_REMOTE_SERIAL_PAIRED)})
+
+    # Check entities
+    assert list(entity_registry.entities.keys()) == unordered(
+        [
+            *get_balance_entity_ids(),
+            *get_remote_entity_ids(),
+        ]
+    )
+    remote_callback = client.get_notification_notifications.call_args[0][0]
+
+    # Trigger the notification
+    await remote_callback(
+        WebsocketNotificationTag(
+            value=WebsocketNotification.REMOTE_CONTROL_DEVICES.value
+        )
+    )
+
+    await hass.async_block_till_done()
+
+    # Check device and API call count (triggered once by the WebSocket notification)
+    assert client.get_bluetooth_remotes.call_count == 4
+    assert device_registry.async_get_device({(DOMAIN, TEST_REMOTE_SERIAL_PAIRED)})
+
+    # Check entities
+    entity_ids_available = list(entity_registry.entities.keys())
+    assert entity_ids_available == unordered(
+        [
+            *get_balance_entity_ids(),
+            *get_remote_entity_ids(),
+        ]
+    )
+    assert entity_ids_available == snapshot
+
+
+async def test_on_remote_control_paired(
+    hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
+    device_registry: DeviceRegistry,
+    entity_registry: EntityRegistry,
+    integration: tuple[MockConfigEntry, AsyncMock],
+    snapshot: SnapshotAssertion,
+) -> None:
+    """Test that the integration reloads when a new remote has been paired."""
+    config_entry, client = integration
+
+    # Check device and API call count
+    assert client.get_bluetooth_remotes.call_count == 3
+    assert device_registry.async_get_device({(DOMAIN, TEST_REMOTE_SERIAL_PAIRED)})
+
+    # Check number of entities (button events and media_player)
+    assert list(entity_registry.entities.keys()) == unordered(
+        [
+            *get_balance_entity_ids(),
+            *get_remote_entity_ids(),
+        ]
+    )
+    # "Pair" a new remote
+    client.get_bluetooth_remotes.return_value = PairedRemoteResponse(
+        items=[
+            # Already paired
+            PairedRemote(
+                address="",
+                app_version="1.0.0",
+                battery_level=50,
+                connected=True,
+                serial_number=TEST_REMOTE_SERIAL,
+                name="BEORC",
+            ),
+            # Not paired yet
+            PairedRemote(
+                address="",
+                app_version="1.0.0",
+                battery_level=50,
+                connected=True,
+                serial_number="66666666",
+                name="BEORC",
+            ),
+        ]
+    )
+    remote_callback = client.get_notification_notifications.call_args[0][0]
+
+    # Trigger the notification
+    await remote_callback(
+        WebsocketNotificationTag(
+            value=WebsocketNotification.REMOTE_CONTROL_DEVICES.value
+        )
+    )
+    await hass.async_block_till_done()
+
+    # Check device and API call count
+    assert client.get_bluetooth_remotes.call_count == 8
+    assert device_registry.async_get_device({(DOMAIN, TEST_REMOTE_SERIAL_PAIRED)})
+    assert device_registry.async_get_device(
+        {(DOMAIN, f"66666666_{TEST_SERIAL_NUMBER}")}
+    )
+    # Check logger
+    assert (
+        f"A Beoremote One has been paired or unpaired to {config_entry.title}. Reloading config entry to add device and entities"
+        in caplog.text
+    )
+
+    # Check number of entities (remote and button events and media_player)
+    entity_ids_available = list(entity_registry.entities.keys())
+
+    assert entity_ids_available == unordered(
+        [
+            *get_remote_entity_ids(remote_serial="66666666"),
+            *get_remote_entity_ids(),
+            *get_balance_entity_ids(),
+        ]
+    )
+    assert entity_ids_available == snapshot
+
+
+async def test_on_remote_control_unpaired(
+    hass: HomeAssistant,
+    caplog: pytest.LogCaptureFixture,
+    device_registry: DeviceRegistry,
+    entity_registry: EntityRegistry,
+    integration: tuple[MockConfigEntry, AsyncMock],
+    snapshot: SnapshotAssertion,
+) -> None:
+    """Test that the integration reloads when a remote has been unpaired."""
+    config_entry, client = integration
+
+    # Check device and API call count
+    assert client.get_bluetooth_remotes.call_count == 3
+    assert device_registry.async_get_device({(DOMAIN, TEST_REMOTE_SERIAL_PAIRED)})
+
+    # Check number of entities (button events and media_player)
+    assert list(entity_registry.entities.keys()) == unordered(
+        [
+            *get_remote_entity_ids(),
+            *get_balance_entity_ids(),
+        ]
+    )
+    # "Unpair" the remote
+    client.get_bluetooth_remotes.return_value = PairedRemoteResponse(items=[])
+    remote_callback = client.get_notification_notifications.call_args[0][0]
+
+    # Trigger the notification
+    await remote_callback(
+        WebsocketNotificationTag(
+            value=WebsocketNotification.REMOTE_CONTROL_DEVICES.value
+        )
+    )
+    await hass.async_block_till_done()
+
+    # Check device and API call count
+    assert client.get_bluetooth_remotes.call_count == 6
+    assert (
+        device_registry.async_get_device({(DOMAIN, TEST_REMOTE_SERIAL_PAIRED)}) is None
+    )
+
+    # Check logger
+    assert (
+        f"A Beoremote One has been paired or unpaired to {config_entry.title}. Reloading config entry to add device and entities"
+        in caplog.text
+    )
+
+    # Check entities
+    entity_ids_available = list(entity_registry.entities.keys())
+
+    assert entity_ids_available == unordered(get_balance_entity_ids())
+    assert entity_ids_available == snapshot
 
 
 async def test_on_all_notifications_raw(
     hass: HomeAssistant,
     caplog: pytest.LogCaptureFixture,
     device_registry: DeviceRegistry,
-    mock_config_entry: MockConfigEntry,
-    mock_mozart_client: AsyncMock,
+    integration: tuple[MockConfigEntry, AsyncMock],
 ) -> None:
     """Test on_all_notifications_raw logs and fires as expected."""
+    config_entry, client = integration
 
-    mock_config_entry.add_to_hass(hass)
-    await hass.config_entries.async_setup(mock_config_entry.entry_id)
-
-    all_notifications_raw_callback = (
-        mock_mozart_client.get_all_notifications_raw.call_args[0][0]
-    )
+    all_notifications_raw_callback = client.get_all_notifications_raw.call_args[0][0]
 
     raw_notification = {
         "eventData": {
@@ -137,15 +318,15 @@ async def test_on_all_notifications_raw(
     }
 
     # Get device ID for the modified notification that is sent as an event and in the log
-    assert mock_config_entry.unique_id
+    assert config_entry.unique_id
     assert (
         device := device_registry.async_get_device(
-            identifiers={(DOMAIN, mock_config_entry.unique_id)}
+            identifiers={(DOMAIN, config_entry.unique_id)}
         )
     )
     raw_notification_full = {
         "device_id": device.id,
-        "serial_number": int(mock_config_entry.unique_id),
+        "serial_number": int(config_entry.unique_id),
         **raw_notification,
     }
 
@@ -153,8 +334,8 @@ async def test_on_all_notifications_raw(
 
     mock_event_callback = Mock()
 
-    # Listen to BANG_OLUFSEN_WEBSOCKET_EVENT events
-    hass.bus.async_listen(BANG_OLUFSEN_WEBSOCKET_EVENT, mock_event_callback)
+    # Listen to MOZART_WEBSOCKET_EVENT events
+    hass.bus.async_listen(MOZART_WEBSOCKET_EVENT, mock_event_callback)
 
     # Trigger the notification
     all_notifications_raw_callback(raw_notification)
@@ -163,5 +344,5 @@ async def test_on_all_notifications_raw(
     assert str(raw_notification_full) in caplog.text
 
     mocked_call = mock_event_callback.call_args[0][0].as_dict()
-    assert mocked_call["event_type"] == BANG_OLUFSEN_WEBSOCKET_EVENT
+    assert mocked_call["event_type"] == MOZART_WEBSOCKET_EVENT
     assert mocked_call["data"] == raw_notification_full

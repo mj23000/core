@@ -10,32 +10,100 @@ from mozart_api.exceptions import ApiException
 from mozart_api.mozart_client import MozartClient
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.const import CONF_HOST, CONF_MODEL
-from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
+from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
+from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN
+from homeassistant.components.input_boolean import DOMAIN as INPUT_BOOLEAN_DOMAIN
+from homeassistant.components.input_button import DOMAIN as INPUT_BUTTON_DOMAIN
+from homeassistant.components.input_number import DOMAIN as INPUT_NUMBER_DOMAIN
+from homeassistant.components.light import DOMAIN as LIGHT_DOMAIN
+from homeassistant.components.number import DOMAIN as NUMBER_DOMAIN
+from homeassistant.components.script import DOMAIN as SCRIPT_DOMAIN
+from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
+from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlow,
+)
+from homeassistant.const import (
+    ATTR_NAME,
+    CONF_ENTITIES,
+    CONF_HOST,
+    CONF_ICON,
+    CONF_MODEL,
+)
+from homeassistant.core import callback
+from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
+    SelectSelector,
+    SelectSelectorConfig,
+)
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.util.ssl import get_default_context
+from homeassistant.util.uuid import random_uuid_hex
 
+from .beoremote_halo.halo import Halo
+from .beoremote_halo.models import (
+    BaseConfiguration,
+    Button,
+    Configuration,
+    Icon,
+    Icons,
+    Page,
+    Text,
+)
 from .const import (
     ATTR_FRIENDLY_NAME,
+    ATTR_HALO_SERIAL_NUMBER,
     ATTR_ITEM_NUMBER,
-    ATTR_SERIAL_NUMBER,
+    ATTR_MOZART_SERIAL_NUMBER,
     ATTR_TYPE_NUMBER,
-    COMPATIBLE_MODELS,
+    CONF_DEFAULT_BUTTON,
+    CONF_ENTITY_MAP,
+    CONF_HALO,
+    CONF_PAGE_NAME,
+    CONF_PAGES,
     CONF_SERIAL_NUMBER,
+    CONF_SUBTITLE,
+    CONF_TEXT,
+    CONF_TITLE,
     DEFAULT_MODEL,
     DOMAIN,
+    HALO_BUTTON_ICONS,
+    HALO_MAX_NUM_BUTTONS,
+    HALO_MAX_NUM_PAGES,
+    HALO_TEXT_LENGTH,
+    HALO_TITLE_LENGTH,
+    MOZART_MODELS,
+    ZEROCONF_HALO,
+    ZEROCONF_MOZART,
+    BangOlufsenModel,
 )
 from .util import get_serial_number_from_jid
 
 
-class EntryData(TypedDict, total=False):
+def halo_uuid() -> str:
+    """Get a properly formatted Halo UUID."""
+    # UUIDs from uuid1() are not unique when generated in Home Assistant (???)
+    # Use this function to generate and format UUIDs instead.
+    temp_uuid = random_uuid_hex()
+    return f"{temp_uuid[:8]}-{temp_uuid[8:12]}-{temp_uuid[12:16]}-{temp_uuid[16:20]}-{temp_uuid[20:32]}"
+
+
+class BangOlufsenEntryData(TypedDict, total=False):
     """TypedDict for config_entry data."""
 
     host: str
-    jid: str
     model: str
     name: str
+    # Mozart
+    jid: str
+    # Halo
+    # Does not seem to handle objects well through restarts
+    halo: dict | None
+    entity_map: dict[str, str]
 
 
 # Map exception types to strings
@@ -51,7 +119,8 @@ class BangOlufsenConfigFlowHandler(ConfigFlow, domain=DOMAIN):
     """Handle a config flow."""
 
     _beolink_jid = ""
-    _client: MozartClient
+    _mozart_client: MozartClient
+    _halo_client: Halo
     _host = ""
     _model = ""
     _name = ""
@@ -70,7 +139,7 @@ class BangOlufsenConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_HOST): str,
                 vol.Required(CONF_MODEL, default=DEFAULT_MODEL): SelectSelector(
-                    SelectSelectorConfig(options=COMPATIBLE_MODELS)
+                    SelectSelectorConfig(options=MOZART_MODELS)
                 ),
             }
         )
@@ -79,7 +148,6 @@ class BangOlufsenConfigFlowHandler(ConfigFlow, domain=DOMAIN):
             self._host = user_input[CONF_HOST]
             self._model = user_input[CONF_MODEL]
 
-            # Check if the IP address is a valid IPv4 address.
             try:
                 IPv4Address(self._host)
             except AddressValueError as error:
@@ -89,14 +157,14 @@ class BangOlufsenConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                     errors={"base": _exception_map[type(error)]},
                 )
 
-            self._client = MozartClient(
-                host=self._host, ssl_context=get_default_context()
+            self._mozart_client = MozartClient(
+                self._host, ssl_context=get_default_context()
             )
 
             # Try to get information from Beolink self method.
-            async with self._client:
+            async with self._mozart_client:
                 try:
-                    beolink_self = await self._client.get_beolink_self(
+                    beolink_self = await self._mozart_client.get_beolink_self(
                         _request_timeout=3
                     )
                 except (
@@ -128,39 +196,69 @@ class BangOlufsenConfigFlowHandler(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Handle discovery using Zeroconf."""
 
-        # Check if the discovered device is a Mozart device
-        if ATTR_FRIENDLY_NAME not in discovery_info.properties:
-            return self.async_abort(reason="not_mozart_device")
-
         # Ensure that an IPv4 address is received
         self._host = discovery_info.host
+
         try:
             IPv4Address(self._host)
         except AddressValueError:
             return self.async_abort(reason="ipv6_address")
 
-        # Check connection to ensure valid address is received
-        self._client = MozartClient(self._host, ssl_context=get_default_context())
+        # Default to Mozart products
+        name_key = ATTR_FRIENDLY_NAME
 
-        async with self._client:
-            try:
-                await self._client.get_beolink_self(_request_timeout=3)
-            except (ClientConnectorError, TimeoutError):
-                return self.async_abort(reason="invalid_address")
+        # Handle Mozart based products
+        if discovery_info.type == ZEROCONF_MOZART:
+            if (status := await self._zeroconf_mozart(discovery_info)) is not None:
+                return status
 
-        self._model = discovery_info.hostname[:-16].replace("-", " ")
-        self._serial_number = discovery_info.properties[ATTR_SERIAL_NUMBER]
-        self._beolink_jid = f"{discovery_info.properties[ATTR_TYPE_NUMBER]}.{discovery_info.properties[ATTR_ITEM_NUMBER]}.{self._serial_number}@products.bang-olufsen.com"
+        # Handle Beoremote Halo
+        elif discovery_info.type == ZEROCONF_HALO:
+            self._zeroconf_halo(discovery_info)
+            name_key = ATTR_NAME
 
         await self.async_set_unique_id(self._serial_number)
         self._abort_if_unique_id_configured(updates={CONF_HOST: self._host})
 
         # Set the discovered device title
         self.context["title_placeholders"] = {
-            "name": discovery_info.properties[ATTR_FRIENDLY_NAME]
+            "name": discovery_info.properties[name_key]
         }
 
         return await self.async_step_zeroconf_confirm()
+
+    def _zeroconf_halo(
+        self, discovery_info: ZeroconfServiceInfo
+    ) -> ConfigFlowResult | None:
+        """Handle Zeroconf discovery of Halo."""
+        self._serial_number = discovery_info.properties[ATTR_HALO_SERIAL_NUMBER]
+        self._model = BangOlufsenModel.BEOREMOTE_HALO
+        return None
+
+    async def _zeroconf_mozart(
+        self, discovery_info: ZeroconfServiceInfo
+    ) -> ConfigFlowResult | None:
+        """Handle Zeroconf discovery of Mozart products."""
+        # Check if the discovered device is a Mozart device
+        if ATTR_FRIENDLY_NAME not in discovery_info.properties:
+            return self.async_abort(reason="not_mozart_device")
+
+        # Check connection to ensure valid address is received
+        self._mozart_client = MozartClient(
+            self._host, ssl_context=get_default_context()
+        )
+
+        async with self._mozart_client:
+            try:
+                await self._mozart_client.get_beolink_self(_request_timeout=3)
+            except (ClientConnectorError, TimeoutError):
+                return self.async_abort(reason="invalid_address")
+
+        self._model = discovery_info.hostname[:-16].replace("-", " ")
+        self._serial_number = discovery_info.properties[ATTR_MOZART_SERIAL_NUMBER]
+        self._beolink_jid = f"{discovery_info.properties[ATTR_TYPE_NUMBER]}.{discovery_info.properties[ATTR_ITEM_NUMBER]}.{self._serial_number}@products.bang-olufsen.com"
+
+        return None
 
     async def _create_entry(self) -> ConfigFlowResult:
         """Create the config entry for a discovered or manually configured Bang & Olufsen device."""
@@ -169,11 +267,12 @@ class BangOlufsenConfigFlowHandler(ConfigFlow, domain=DOMAIN):
 
         return self.async_create_entry(
             title=self._name,
-            data=EntryData(
+            data=BangOlufsenEntryData(
                 host=self._host,
                 jid=self._beolink_jid,
                 model=self._model,
                 name=self._name,
+                halo=None,
             ),
         )
 
@@ -194,4 +293,329 @@ class BangOlufsenConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 CONF_SERIAL_NUMBER: self._serial_number,
             },
             last_step=True,
+        )
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: ConfigEntry,
+    ) -> OptionsFlow:
+        """Create the options flow."""
+        # This option should only be available for the Halo,
+        # but this is currently not supported by Home Assistant.
+        return HaloOptionsFlowHandler()
+
+
+class HaloOptionsFlowHandler(OptionsFlow):
+    """HaloOptionsFlowHandler."""
+
+    def __init__(self) -> None:
+        """Initialize options."""
+        self._configuration: BaseConfiguration = BaseConfiguration(Configuration([]))
+        self._entity_ids: list[str] = []
+        self._entity_map: dict[str, str] = {}
+        self._page: Page
+        self._current_default: str = str(None)
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Manage the options."""
+        # Reject options for any non-Halo device
+        if self.config_entry.data[CONF_MODEL] != BangOlufsenModel.BEOREMOTE_HALO:
+            return self.async_abort(
+                reason="invalid_model",
+                description_placeholders={"model": self.config_entry.data[CONF_MODEL]},
+            )
+
+        # Load stored configuration, entity map and current default button
+        if self.config_entry.options:
+            self._configuration = BaseConfiguration.from_dict(
+                self.config_entry.options[CONF_HALO]
+            )
+            self._entity_map = self.config_entry.options[CONF_ENTITY_MAP]
+
+        # Check for a current default button.
+        # There should only be a single default in the whole configuration
+        for page in self._configuration.configuration.pages:
+            for button in page.buttons:
+                if button.default:
+                    self._current_default = f"{page.title}-{button.title} ({button.id})"
+
+        # Remove "add_page" option if 3 already are in the configuration
+        options = []
+        if len(self._configuration.configuration.pages) < HALO_MAX_NUM_PAGES:
+            options.append("add_page")
+        options.extend(["delete_pages", "modify_default"])
+
+        return self.async_show_menu(step_id="init", menu_options=options)
+
+    async def async_step_add_page(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Add a new page."""
+
+        if user_input is not None:
+            self._page = Page(user_input[CONF_PAGE_NAME], [], id=halo_uuid())
+            self._entity_ids = user_input[CONF_ENTITIES]
+
+            # Ensure that there are no more than 8 selected entities
+            if len(self._entity_ids) > HALO_MAX_NUM_BUTTONS:
+                return self.async_abort(
+                    reason="too_many_buttons",
+                    description_placeholders={
+                        "num_buttons": str(len(self._entity_ids))
+                    },
+                )
+
+            # Ensure that all page names are unique
+            page_names = [
+                page.title for page in self._configuration.configuration.pages
+            ]
+
+            if self._page.title in page_names:
+                return self.async_abort(
+                    reason="invalid_page_name",
+                    description_placeholders={"page_name": self._page.title},
+                )
+
+            return await self.async_step_create_buttons()
+
+        options_schema = vol.Schema(
+            {
+                vol.Required(CONF_PAGE_NAME): str,
+                vol.Required(CONF_ENTITIES): EntitySelector(
+                    EntitySelectorConfig(
+                        multiple=True,
+                        domain=[
+                            BINARY_SENSOR_DOMAIN,
+                            BUTTON_DOMAIN,
+                            INPUT_BOOLEAN_DOMAIN,
+                            INPUT_BUTTON_DOMAIN,
+                            INPUT_NUMBER_DOMAIN,
+                            LIGHT_DOMAIN,
+                            NUMBER_DOMAIN,
+                            SCRIPT_DOMAIN,
+                            SENSOR_DOMAIN,
+                            SWITCH_DOMAIN,
+                        ],
+                    )
+                ),
+            }
+        )
+
+        return self.async_show_form(
+            step_id="add_page",
+            data_schema=options_schema,
+        )
+
+    async def async_step_create_buttons(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Add buttons to new page."""
+        if user_input is not None:
+            button = Button(
+                title=user_input[CONF_TITLE],
+                subtitle=user_input[CONF_SUBTITLE],
+                content=(
+                    Icon(Icons[user_input[CONF_ICON]])
+                    if CONF_ICON in user_input
+                    else Text(user_input[CONF_TEXT])
+                ),
+                id=halo_uuid(),
+            )
+            self._entity_map[button.id] = self._entity_ids[-1]
+
+            self._page.buttons.append(button)
+
+            self._entity_ids.pop()
+
+            if not self._entity_ids:
+                self._configuration.configuration.pages.append(self._page)
+
+                return self.async_create_entry(
+                    title=f"Page {self._page.title} added to configuration",
+                    data=BangOlufsenEntryData(
+                        host=self.config_entry.data[CONF_HOST],
+                        model=self.config_entry.data[CONF_MODEL],
+                        name=self.config_entry.title,
+                        halo=self._configuration.to_dict(),
+                        entity_map=self._entity_map,
+                    ),
+                )
+
+        return self.async_show_form(
+            step_id="create_buttons",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_TITLE): vol.All(
+                        str,
+                        vol.Length(max=HALO_TITLE_LENGTH),
+                    ),
+                    vol.Optional(CONF_SUBTITLE, default=""): vol.All(
+                        str,
+                        vol.Length(max=HALO_TITLE_LENGTH),
+                    ),
+                    vol.Exclusive(CONF_ICON, "content", "Error"): SelectSelector(
+                        SelectSelectorConfig(options=HALO_BUTTON_ICONS)
+                    ),
+                    vol.Exclusive(CONF_TEXT, "content", "Error"): vol.All(
+                        str,
+                        vol.Length(max=HALO_TEXT_LENGTH),
+                    ),
+                },
+            ),
+            description_placeholders={
+                "entity": self._entity_ids[-1],
+                "page": self._page.title,
+            },
+        )
+
+    async def async_step_delete_pages(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Delete selected pages."""
+
+        if user_input is not None:
+            for page_name in user_input[CONF_PAGES]:
+                for page in self._configuration.configuration.pages.copy():
+                    if page.title == page_name:
+                        # Remove page from configuration
+                        self._configuration.configuration.pages.remove(page)
+
+                        # Remove used button ids from entity_map
+                        for button in page.buttons:
+                            self._entity_map.pop(button.id)
+
+            return self.async_create_entry(
+                title="Updated configuration",
+                data=BangOlufsenEntryData(
+                    host=self.config_entry.data[CONF_HOST],
+                    model=self.config_entry.data[CONF_MODEL],
+                    name=self.config_entry.title,
+                    halo=self._configuration.to_dict(),
+                    entity_map=self._entity_map,
+                ),
+            )
+        pages = [page.title for page in self._configuration.configuration.pages]
+
+        if len(pages) == 0:
+            return self.async_abort(reason="no_pages")
+
+        return self.async_show_form(
+            step_id="delete_pages",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_PAGES): SelectSelector(
+                        SelectSelectorConfig(
+                            options=pages,
+                            multiple=True,
+                        )
+                    ),
+                }
+            ),
+        )
+
+    async def async_step_modify_default(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Enter default options."""
+
+        return self.async_show_menu(
+            step_id="modify_default",
+            menu_options=["select_default", "remove_default"],
+            description_placeholders={"current_default": self._current_default},
+        )
+
+    async def async_step_select_default(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Select a default button."""
+        if user_input is not None:
+            # Update configuration with new default
+            new_default = user_input[CONF_DEFAULT_BUTTON]
+
+            # Find the pages and buttons in the configuration
+            for page_idx, page in enumerate(self._configuration.configuration.pages):
+                for button_idx, button in enumerate(page.buttons):
+                    # Add new default to configuration
+                    if button.id in new_default:
+                        self._configuration.configuration.pages[page_idx].buttons[
+                            button_idx
+                        ].default = True
+
+                    # Remove current default from configuration
+                    if button.id in self._current_default:
+                        self._configuration.configuration.pages[page_idx].buttons[
+                            button_idx
+                        ].default = False
+
+            return self.async_create_entry(
+                title="Updated configuration",
+                data=BangOlufsenEntryData(
+                    host=self.config_entry.data[CONF_HOST],
+                    model=self.config_entry.data[CONF_MODEL],
+                    name=self.config_entry.title,
+                    halo=self._configuration.to_dict(),
+                    entity_map=self._entity_map,
+                ),
+            )
+
+        # Get all buttons and check for a current default button
+        buttons = []
+        for page in self._configuration.configuration.pages:
+            buttons.extend(
+                [
+                    f"{page.title}-{button.title} ({button.id})"
+                    for button in page.buttons
+                    if button.default is False
+                ]
+            )
+
+        # Abort if no buttons are available
+        if len(buttons) == 0:
+            return self.async_abort(reason="no_pages")
+
+        return self.async_show_form(
+            step_id="select_default",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_DEFAULT_BUTTON): SelectSelector(
+                        SelectSelectorConfig(
+                            options=buttons,
+                            multiple=False,
+                            sort=True,
+                        )
+                    ),
+                }
+            ),
+            description_placeholders={"current_default": self._current_default},
+        )
+
+    async def async_step_remove_default(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Remove the default attribute from a button."""
+
+        # Abort if no buttons are available
+        if self._current_default == str(None):
+            return self.async_abort(reason="no_default")
+
+        # Remove current default from configuration
+        for page_idx, page in enumerate(self._configuration.configuration.pages):
+            for button_idx, button in enumerate(page.buttons):
+                if button.id in self._current_default:
+                    self._configuration.configuration.pages[page_idx].buttons[
+                        button_idx
+                    ].default = False
+
+        return self.async_create_entry(
+            title="Updated configuration",
+            data=BangOlufsenEntryData(
+                host=self.config_entry.data[CONF_HOST],
+                model=self.config_entry.data[CONF_MODEL],
+                name=self.config_entry.title,
+                halo=self._configuration.to_dict(),
+                entity_map=self._entity_map,
+            ),
         )

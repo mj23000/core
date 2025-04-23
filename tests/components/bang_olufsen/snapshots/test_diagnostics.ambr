@@ -1,24 +1,9 @@
 # serializer version: 1
 # name: test_async_get_config_entry_diagnostics
   dict({
-    'PlayPause_event': dict({
-      'attributes': dict({
-        'device_class': 'button',
-        'event_type': None,
-        'event_types': list([
-          'short_press_release',
-          'long_press_timeout',
-          'long_press_release',
-          'very_long_press_timeout',
-          'very_long_press_release',
-        ]),
-        'friendly_name': 'Living room Balance Play / Pause',
-      }),
-      'entity_id': 'event.beosound_balance_11111111_play_pause',
-      'state': 'unknown',
-    }),
     'config_entry': dict({
       'data': dict({
+        'halo': None,
         'host': '192.168.0.1',
         'jid': '1111.1111111.11111111@products.bang-olufsen.com',
         'model': 'Beosound Balance',
@@ -57,6 +42,11 @@
         }),
         'device_class': 'speaker',
         'entity_picture_local': None,
+        'favourites': dict({
+          '1': dict({
+            'title': None,
+          }),
+        }),
         'friendly_name': 'Living room Balance',
         'group_members': list([
           'media_player.beosound_balance_11111111',
@@ -64,6 +54,8 @@
           'listener_not_in_hass-1111.1111111.44444444@products.bang-olufsen.com',
         ]),
         'media_content_type': 'music',
+        'repeat': 'off',
+        'shuffle': False,
         'sound_mode': 'Test Listening Mode (123)',
         'sound_mode_list': list([
           'Test Listening Mode (123)',
@@ -75,10 +67,11 @@
           'Line-In',
           'HDMI A',
         ]),
-        'supported_features': 2095933,
+        'supported_features': 2095935,
+        'volume_level': 0.0,
       }),
       'entity_id': 'media_player.beosound_balance_11111111',
-      'state': 'playing',
+      'state': 'idle',
     }),
     'websocket_connected': False,
   })

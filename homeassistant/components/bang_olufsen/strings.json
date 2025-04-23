@@ -2,6 +2,8 @@
   "common": {
     "jid_options_description": "Advanced grouping options, where devices' unique Beolink IDs (Called JIDs) are used directly. JIDs can be found in the state attributes of the media player entity.",
     "jid_options_name": "JID options",
+    "key_press": "Press",
+    "key_release": "Release",
     "long_press_release": "Release of long press",
     "long_press_timeout": "Long press",
     "short_press_release": "Release of short press",
@@ -12,8 +14,8 @@
     "error": {
       "api_exception": "[%key:common::config_flow::error::cannot_connect%]",
       "client_connector_error": "[%key:common::config_flow::error::cannot_connect%]",
-      "timeout_error": "[%key:common::config_flow::error::cannot_connect%]",
-      "invalid_ip": "Invalid IPv4 address"
+      "invalid_ip": "Invalid IPv4 address",
+      "timeout_error": "[%key:common::config_flow::error::cannot_connect%]"
     },
     "abort": {
       "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
@@ -29,13 +31,244 @@
         "description": "Manually configure your Bang & Olufsen device."
       },
       "zeroconf_confirm": {
-        "title": "Set up Bang & Olufsen device",
+        "title": "Setup Bang & Olufsen device",
         "description": "Confirm the configuration of the {model}-{serial_number} @ {host}."
       }
     }
   },
+  "options": {
+    "abort": {
+      "invalid_model": "The {model} does not support configuration.",
+      "no_pages": "No pages available.",
+      "no_default": "No current default.",
+      "invalid_page_name": "Can't add page {page_name} as names must be unique.",
+      "too_many_buttons": "Can't add {num_buttons} buttons as only 8 are supported per page."
+    },
+    "step": {
+      "init": {
+        "description": "Configure Beoremote Halo for Home Assistant. 3 pages are supported per configuration",
+        "menu_options": {
+          "add_page": "Create a new page",
+          "delete_pages": "Delete existing pages",
+          "modify_default": "Modify default button"
+        }
+      },
+      "add_page": {
+        "title": "Add page",
+        "description": "Create a new page with selected entities. 8 buttons are supported per page",
+        "data": {
+          "page_name": "Page name",
+          "entities": "Entities"
+        }
+      },
+      "create_buttons": {
+        "title": "Configure button",
+        "description": "Select a configuration for the {entity} button in the {page} page",
+        "data": {
+          "icon": "Icon",
+          "text": "Text",
+          "title": "Title",
+          "subtitle": "Subtitle"
+        }
+      },
+      "delete_pages": {
+        "title": "Delete pages",
+        "description": "Delete selected pages",
+        "data": {
+          "pages": "Pages"
+        }
+      },
+      "modify_default": {
+        "title": "Modify default",
+        "description": "Select or remove a default button for the Beoremote Halo. Current default is: {current_default}",
+        "menu_options": {
+          "select_default": "Select a new default button",
+          "remove_default": "Remove the default attribute from a button"
+        }
+      },
+      "select_default": {
+        "title": "Select default",
+        "description": "Select a new default button. Current default is: {current_default} and can't be selected",
+        "data": {
+          "default_button": "Default button"
+        }
+      }
+    }
+  },
+  "selector": {
+    "source_ids": {
+      "options": {
+        "beoradio": "ASE Beoradio",
+        "deezer": "ASE / Mozart Deezer",
+        "spotify": "ASE / Mozart Spotify",
+        "tidal": "Mozart Tidal",
+        "aux_a": "Beolink Converter NL/ML AUX_A",
+        "cd": "Beolink Converter NL/ML CD",
+        "ph": "Beolink Converter NL/ML PH",
+        "radio": "Beolink Converter NL/ML RADIO",
+        "tp1": "Beolink Converter NL/ML TP1",
+        "tp2": "Beolink Converter NL/ML TP2"
+      }
+    }
+  },
+  "services": {
+    "beolink_allstandby": {
+      "name": "Beolink all standby",
+      "description": "Set all Connected Beolink devices to standby."
+    },
+    "beolink_expand": {
+      "name": "Beolink expand",
+      "description": "Expand current Beolink experience.",
+      "fields": {
+        "all_discovered": {
+          "name": "All discovered",
+          "description": "Expand Beolink experience to all discovered devices."
+        },
+        "beolink_jids": {
+          "name": "Beolink JIDs",
+          "description": "Specify which Beolink JIDs will join current Beolink experience."
+        }
+      },
+      "sections": {
+        "jid_options": {
+          "name": "[%key:component::bang_olufsen::common::jid_options_name%]",
+          "description": "[%key:component::bang_olufsen::common::jid_options_description%]"
+        }
+      }
+    },
+    "beolink_join": {
+      "name": "Beolink join",
+      "description": "Join a Beolink experience.",
+      "fields": {
+        "beolink_jid": {
+          "name": "Beolink JID",
+          "description": "Manually specify Beolink JID to join."
+        },
+        "source_id": {
+          "name": "Source",
+          "description": "Specify which source to join, behavior varies between hardware platforms. Source names prefaced by a platform name can only be used when connecting to that platform. For example \"ASE Beoradio\" can only be used when joining an ASE device, while \u201dASE / Mozart Deezer\u201d can be used with ASE or Mozart devices. A defined Beolink JID is required."
+        }
+      },
+      "sections": {
+        "jid_options": {
+          "name": "[%key:component::bang_olufsen::common::jid_options_name%]",
+          "description": "[%key:component::bang_olufsen::common::jid_options_description%]"
+        }
+      }
+    },
+    "beolink_leader_command": {
+      "name": "Beolink leader command",
+      "description": "Send a media_player command to Beolink leader.",
+      "fields": {
+        "command": {
+          "name": "Command",
+          "description": "Specify the media_player command."
+        },
+        "parameter": {
+          "name": "Parameter",
+          "description": "Specify the media_player command's parameter."
+        }
+      }
+    },
+    "beolink_leave": {
+      "name": "Beolink leave",
+      "description": "Leave a Beolink experience."
+    },
+    "beolink_set_relative_volume": {
+      "name": "Beolink set relative volume",
+      "description": "Set a volume level relative to the current level of all connected Beolink devices.",
+      "fields": {
+        "volume_level": {
+          "name": "Volume level",
+          "description": "Specify the volume level."
+        }
+      }
+    },
+    "beolink_set_volume": {
+      "name": "Beolink set volume",
+      "description": "Set a volume level for all connected Beolink devices.",
+      "fields": {
+        "volume_level": {
+          "name": "Volume level",
+          "description": "Specify the volume level."
+        }
+      }
+    },
+    "beolink_unexpand": {
+      "name": "Beolink unexpand",
+      "description": "Unexpand from current Beolink experience.",
+      "fields": {
+        "beolink_jids": {
+          "name": "Beolink JIDs",
+          "description": "Specify which Beolink JIDs will leave from current Beolink experience."
+        }
+      },
+      "sections": {
+        "jid_options": {
+          "name": "[%key:component::bang_olufsen::common::jid_options_name%]",
+          "description": "[%key:component::bang_olufsen::common::jid_options_description%]"
+        }
+      }
+    },
+    "halo_configuration": {
+      "name": "Halo Configuration",
+      "description": "Get the raw Halo configuration."
+    },
+    "halo_notification": {
+      "name": "Halo Notification",
+      "description": "Send a notification to the Halo.",
+      "fields": {
+        "title": {
+          "name": "Title",
+          "description": "The title of the notification"
+        },
+        "subtitle": {
+          "name": "Subitle",
+          "description": "The subtitle of the notification. 6 lines are supported before formatting starts to break. Use | in yaml mode to construct multiline strings"
+        }
+      }
+    },
+    "halo_display_page": {
+      "name": "Halo Display Page",
+      "description": "Focus on a Page and Button on a Halo",
+      "fields": {
+        "page_id": {
+          "name": "Page ID",
+          "description": "The UUID of a Page"
+        },
+        "subtitle": {
+          "name": "Button ID",
+          "description": "The UUID of a Button"
+        }
+      }
+    },
+    "reboot": {
+      "name": "Reboot",
+      "description": "Reboot the device."
+    }
+  },
   "entity": {
+    "binary_sensor": {
+      "battery_charging": {
+        "name": "Battery charging"
+      },
+      "halo_battery_charging": {
+        "name": "Battery charging"
+      }
+    },
     "event": {
+      "halo_system": {
+        "name": "System status",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "active": "Active",
+              "standby": "Standby",
+              "sleep": "Sleeping"
+            }
+          }
+        }
+      },
       "bluetooth": {
         "name": "Bluetooth",
         "state_attributes": {
@@ -46,6 +279,996 @@
               "long_press_release": "[%key:component::bang_olufsen::common::long_press_release%]",
               "very_long_press_timeout": "[%key:component::bang_olufsen::common::very_long_press_timeout%]",
               "very_long_press_release": "[%key:component::bang_olufsen::common::very_long_press_release%]"
+            }
+          }
+        }
+      },
+      "control_blue": {
+        "name": "Control - Blue",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_digit0": {
+        "name": "Control - Digit 0",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_digit1": {
+        "name": "Control - Digit 1",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_digit2": {
+        "name": "Control - Digit 2",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_digit3": {
+        "name": "Control - Digit 3",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_digit4": {
+        "name": "Control - Digit 4",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_digit5": {
+        "name": "Control - Digit 5",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_digit6": {
+        "name": "Control - Digit 6",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_digit7": {
+        "name": "Control - Digit 7",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_digit8": {
+        "name": "Control - Digit 8",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_digit9": {
+        "name": "Control - Digit 9",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_down": {
+        "name": "Control - Down",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func1": {
+        "name": "Control - Function 1",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func2": {
+        "name": "Control - Function 2",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func3": {
+        "name": "Control - Function 3",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func4": {
+        "name": "Control - Function 4",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func5": {
+        "name": "Control - Function 5",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func6": {
+        "name": "Control - Function 6",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func7": {
+        "name": "Control - Function 7",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func8": {
+        "name": "Control - Function 8",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func9": {
+        "name": "Control - Function 9",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func10": {
+        "name": "Control - Function 10",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func11": {
+        "name": "Control - Function 11",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func12": {
+        "name": "Control - Function 12",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func13": {
+        "name": "Control - Function 13",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func14": {
+        "name": "Control - Function 14",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func15": {
+        "name": "Control - Function 15",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func16": {
+        "name": "Control - Function 16",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func17": {
+        "name": "Control - Function 17",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func18": {
+        "name": "Control - Function 18",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func19": {
+        "name": "Control - Function 19",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func20": {
+        "name": "Control - Function 20",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func21": {
+        "name": "Control - Function 21",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func22": {
+        "name": "Control - Function 22",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func23": {
+        "name": "Control - Function 23",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func24": {
+        "name": "Control - Function 24",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func25": {
+        "name": "Control - Function 25",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func26": {
+        "name": "Control - Function 26",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_func27": {
+        "name": "Control - Function 27",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_green": {
+        "name": "Control - Green",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_left": {
+        "name": "Control - Left",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_play": {
+        "name": "Control - Play",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_red": {
+        "name": "Control - Red",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_rewind": {
+        "name": "Control - Rewind",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_right": {
+        "name": "Control - Right",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_select": {
+        "name": "Control - Select",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_stop": {
+        "name": "Control - Stop",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_up": {
+        "name": "Control - Up",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_wind": {
+        "name": "Control - Wind",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "control_yellow": {
+        "name": "Control - Yellow",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_blue": {
+        "name": "Light - Blue",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_digit0": {
+        "name": "Light - Digit 0",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_digit1": {
+        "name": "Light - Digit 1",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_digit2": {
+        "name": "Light - Digit 2",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_digit3": {
+        "name": "Light - Digit 3",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_digit4": {
+        "name": "Light - Digit 4",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_digit5": {
+        "name": "Light - Digit 5",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_digit6": {
+        "name": "Light - Digit 6",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_digit7": {
+        "name": "Light - Digit 7",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_digit8": {
+        "name": "Light - Digit 8",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_digit9": {
+        "name": "Light - Digit 9",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_down": {
+        "name": "Light - Down",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func1": {
+        "name": "Light - Function 1",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func2": {
+        "name": "Light - Function 2",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func3": {
+        "name": "Light - Function 3",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func4": {
+        "name": "Light - Function 4",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func5": {
+        "name": "Light - Function 5",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func6": {
+        "name": "Light - Function 6",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func7": {
+        "name": "Light - Function 7",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func8": {
+        "name": "Light - Function 8",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func9": {
+        "name": "Light - Function 9",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func10": {
+        "name": "Light - Function 10",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func11": {
+        "name": "Light - Function 11",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func12": {
+        "name": "Light - Function 12",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func13": {
+        "name": "Light - Function 13",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func14": {
+        "name": "Light - Function 14",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func15": {
+        "name": "Light - Function 15",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func16": {
+        "name": "Light - Function 16",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_func17": {
+        "name": "Light- Function 17",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_green": {
+        "name": "Light - Green",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_left": {
+        "name": "Light - Left",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_play": {
+        "name": "Light - Play",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_red": {
+        "name": "Light - Red",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_rewind": {
+        "name": "Light - Rewind",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_right": {
+        "name": "Light - Right",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_select": {
+        "name": "Light - Select",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_stop": {
+        "name": "Light - Stop",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_up": {
+        "name": "Light - Up",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_wind": {
+        "name": "Light - Wind",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
+            }
+          }
+        }
+      },
+      "light_yellow": {
+        "name": "Light - Yellow",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "key_press": "[%key:component::bang_olufsen::common::key_press%]",
+              "key_release": "[%key:component::bang_olufsen::common::key_release%]"
             }
           }
         }
@@ -162,6 +1385,17 @@
           }
         }
       },
+      "proximity": {
+        "name": "Proximity",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "proximity_presence_detected": "Presence detected",
+              "proximity_presence_not_detected": "No presence detected"
+            }
+          }
+        }
+      },
       "volume": {
         "name": "Volume",
         "state_attributes": {
@@ -176,87 +1410,32 @@
           }
         }
       }
-    }
-  },
-  "selector": {
-    "source_ids": {
-      "options": {
-        "beoradio": "ASE Beoradio",
-        "deezer": "ASE / Mozart Deezer",
-        "spotify": "ASE / Mozart Spotify",
-        "tidal": "Mozart Tidal",
-        "aux_a": "Beolink Converter NL/ML AUX_A",
-        "cd": "Beolink Converter NL/ML CD",
-        "ph": "Beolink Converter NL/ML PH",
-        "radio": "Beolink Converter NL/ML RADIO",
-        "tp1": "Beolink Converter NL/ML TP1",
-        "tp2": "Beolink Converter NL/ML TP2"
-      }
-    }
-  },
-  "services": {
-    "beolink_allstandby": {
-      "name": "Beolink all standby",
-      "description": "Sets all connected Beolink devices to standby."
     },
-    "beolink_expand": {
-      "name": "Beolink expand",
-      "description": "Adds devices to the current Beolink experience.",
-      "fields": {
-        "all_discovered": {
-          "name": "All discovered",
-          "description": "Expand Beolink experience to all discovered devices."
-        },
-        "beolink_jids": {
-          "name": "Beolink JIDs",
-          "description": "Specify which Beolink JIDs will join current Beolink experience."
-        }
-      },
-      "sections": {
-        "jid_options": {
-          "name": "[%key:component::bang_olufsen::common::jid_options_name%]",
-          "description": "[%key:component::bang_olufsen::common::jid_options_description%]"
-        }
+    "select": {
+      "listening_position": {
+        "name": "Listening position"
       }
     },
-    "beolink_join": {
-      "name": "Beolink join",
-      "description": "Joins a Beolink experience.",
-      "fields": {
-        "beolink_jid": {
-          "name": "Beolink JID",
-          "description": "Manually specify Beolink JID to join."
-        },
-        "source_id": {
-          "name": "Source",
-          "description": "Specify which source to join, behavior varies between hardware platforms. Source names prefaced by a platform name can only be used when connecting to that platform. For example \"ASE Beoradio\" can only be used when joining an ASE device, while ”ASE / Mozart Deezer” can be used with ASE or Mozart devices. A defined Beolink JID is required."
-        }
+    "sensor": {
+      "battery_level": {
+        "name": "Battery level"
       },
-      "sections": {
-        "jid_options": {
-          "name": "[%key:component::bang_olufsen::common::jid_options_name%]",
-          "description": "[%key:component::bang_olufsen::common::jid_options_description%]"
-        }
+      "halo_battery_level": {
+        "name": "Battery level"
+      },
+      "remote_battery_level": {
+        "name": "Battery level"
+      },
+      "battery_charging_time": {
+        "name": "Battery charging time"
+      },
+      "battery_playing_time": {
+        "name": "Battery playing time"
       }
     },
-    "beolink_leave": {
-      "name": "Beolink leave",
-      "description": "Leaves a Beolink experience."
-    },
-    "beolink_unexpand": {
-      "name": "Beolink unexpand",
-      "description": "Removes devices from the current Beolink experience.",
-      "fields": {
-        "beolink_jids": {
-          "name": "Beolink JIDs",
-          "description": "Specify which Beolink JIDs will leave from current Beolink experience."
-        }
-      },
-      "sections": {
-        "jid_options": {
-          "name": "[%key:component::bang_olufsen::common::jid_options_name%]",
-          "description": "[%key:component::bang_olufsen::common::jid_options_description%]"
-        }
+    "text": {
+      "home_control_uri": {
+        "name": "Home Control URI"
       }
     }
   },
@@ -267,17 +1446,29 @@
     "invalid_source": {
       "message": "Invalid source: {invalid_source}. Valid sources are: {valid_sources}"
     },
+    "beolink_not_playing": {
+      "message": "Can't Beolink expand from a non-playing device."
+    },
     "invalid_media_type": {
       "message": "{invalid_media_type} is an invalid type. Valid values are: {valid_media_types}."
     },
     "play_media_error": {
       "message": "An error occurred while attempting to play {media_type}: {error_message}."
     },
+    "invalid_beolink_parameter": {
+      "message": "Invalid parameter: {parameter} for {command} which expects a parameter of type: {parameter_type}."
+    },
     "invalid_grouping_entity": {
-      "message": "Entity with ID {entity_id} can't be added to the Beolink session. Is the entity a Bang & Olufsen media_player?"
+      "message": "Entity with id: {entity_id} can't be added to the Beolink session. Is the entity a Bang & Olufsen media_player?"
     },
     "invalid_sound_mode": {
       "message": "{invalid_sound_mode} is an invalid sound mode. Valid values are: {valid_sound_modes}."
+    }
+  },
+  "device_automation": {
+    "action_type": {
+      "turn_on": "Turn on {entity_name}",
+      "turn_off": "Turn off {entity_name}"
     }
   }
 }

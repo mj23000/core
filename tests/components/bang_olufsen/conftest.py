@@ -3,8 +3,10 @@
 from collections.abc import Generator
 from unittest.mock import AsyncMock, Mock, patch
 
+from mozart_api import BeolinkJoinResult, Preset, Scene
 from mozart_api.models import (
     Action,
+    BatteryState,
     BeolinkPeer,
     BeolinkSelf,
     ContentItem,
@@ -12,6 +14,8 @@ from mozart_api.models import (
     ListeningModeFeatures,
     ListeningModeRef,
     ListeningModeTrigger,
+    PairedRemote,
+    PairedRemoteResponse,
     PlaybackContentMetadata,
     PlaybackProgress,
     PlaybackState,
@@ -44,6 +48,7 @@ from .const import (
     TEST_JID_4,
     TEST_NAME,
     TEST_NAME_2,
+    TEST_REMOTE_SERIAL,
     TEST_SERIAL_NUMBER,
     TEST_SERIAL_NUMBER_2,
     TEST_SOUND_MODE,
@@ -76,16 +81,54 @@ def mock_config_entry_core() -> MockConfigEntry:
     )
 
 
-@pytest.fixture
-async def mock_media_player(
-    hass: HomeAssistant,
-    mock_config_entry: MockConfigEntry,
-    mock_mozart_client: AsyncMock,
+async def mock_websocket_connection(
+    hass: HomeAssistant, mock_mozart_client: AsyncMock
 ) -> None:
-    """Mock media_player entity."""
+    """Register and receive initial WebSocket notifications."""
+
+    # Currently only add notifications that are used.
+
+    # Register callbacks.
+    volume_callback = mock_mozart_client.get_volume_notifications.call_args[0][0]
+    source_change_callback = (
+        mock_mozart_client.get_source_change_notifications.call_args[0][0]
+    )
+    playback_state_callback = (
+        mock_mozart_client.get_playback_state_notifications.call_args[0][0]
+    )
+    playback_metadata_callback = (
+        mock_mozart_client.get_playback_metadata_notifications.call_args[0][0]
+    )
+
+    # Trigger callbacks. Try to use existing data
+    volume_callback(mock_mozart_client.get_product_state.return_value.volume)
+    source_change_callback(
+        mock_mozart_client.get_product_state.return_value.playback.source
+    )
+    playback_state_callback(
+        mock_mozart_client.get_product_state.return_value.playback.state
+    )
+    playback_metadata_callback(
+        mock_mozart_client.get_product_state.return_value.playback.metadata
+    )
+    await hass.async_block_till_done()
+
+
+@pytest.fixture(name="integration")
+async def integration_fixture(
+    hass: HomeAssistant,
+    mock_mozart_client: AsyncMock,
+    mock_config_entry: MockConfigEntry,
+) -> tuple[MockConfigEntry, AsyncMock]:
+    """Set up the Bang & Olufsen integration."""
 
     mock_config_entry.add_to_hass(hass)
     await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    await mock_websocket_connection(hass, mock_mozart_client)
+
+    return (mock_config_entry, mock_mozart_client)
 
 
 @pytest.fixture
@@ -323,6 +366,65 @@ def mock_mozart_client() -> Generator[AsyncMock]:
             repeat="none",
             shuffle=False,
         )
+        client.get_bluetooth_remotes = AsyncMock()
+        client.get_bluetooth_remotes.return_value = PairedRemoteResponse(
+            items=[
+                PairedRemote(
+                    address="",
+                    app_version="1.0.0",
+                    battery_level=50,
+                    connected=True,
+                    serial_number=TEST_REMOTE_SERIAL,
+                    name="BEORC",
+                )
+            ]
+        )
+        client.get_battery_state = AsyncMock()
+        client.get_battery_state.return_value = BatteryState(
+            battery_level=0,
+            is_charging=False,
+            remaining_charging_time_minutes=0,
+            remaining_playing_time_minutes=0,
+        )
+        client.get_all_scenes = AsyncMock()
+        client.get_all_scenes.return_value = {
+            "0df8fa2e-433d-473c-bb67-62ed88279ba2": Scene(
+                action_list=[
+                    Action(
+                        preset_key="Preset1",
+                        source=Source(value="spotify"),
+                        type="sourcePreset",
+                    )
+                ],
+                classification="system",
+            )
+        }
+        client.get_presets = AsyncMock()
+        client.get_presets.return_value = {
+            "1": Preset(
+                action_list=[
+                    Action(
+                        preset_key="Preset1",
+                        source=Source(value="spotify"),
+                        type="sourcePreset",
+                    )
+                ],
+                content=ContentItem(
+                    categories=["music"],
+                    content_uri="spotify",
+                    label="Spotify Connect",
+                    source=Source(value="spotify"),
+                ),
+            )
+        }
+        client.get_beolink_join_result = AsyncMock()
+        client.get_beolink_join_result.return_value = BeolinkJoinResult(
+            error=None,
+            jid=TEST_JID_1,
+            request_id="0123456-789a-bcde-f012-3456789abcde",
+            status="joined",
+            type="join",
+        )
 
         client.post_standby = AsyncMock()
         client.set_current_volume_level = AsyncMock()
@@ -346,6 +448,18 @@ def mock_mozart_client() -> Generator[AsyncMock]:
         client.join_latest_beolink_experience = AsyncMock()
         client.activate_listening_mode = AsyncMock()
         client.set_settings_queue = AsyncMock()
+
+        # REST API client helper methods
+        client.async_get_beolink_join_result = AsyncMock()
+        client.async_get_beolink_join_result.return_value = BeolinkJoinResult(
+            error=None,
+            jid=TEST_JID_1,
+            request_id="0123456-789a-bcde-f012-3456789abcde",
+            status="joined",
+            type="join",
+        )
+        client.async_post_beolink_expand = AsyncMock()
+        client.async_post_beolink_expand.return_value = True
 
         # Non-REST API client methods
         client.check_device_connection = AsyncMock()
