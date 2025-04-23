@@ -414,6 +414,11 @@ ZEROCONF = {
             "domain": "bang_olufsen",
         },
     ],
+    "_zenith._tcp.local.": [
+        {
+            "domain": "bang_olufsen",
+        },
+    ],
     "_bbxsrv._tcp.local.": [
         {
             "domain": "blebox",
