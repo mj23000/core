@@ -414,11 +414,6 @@ ZEROCONF = {
             "domain": "bang_olufsen",
         },
     ],
-    "_zenith._tcp.local.": [
-        {
-            "domain": "bang_olufsen",
-        },
-    ],
     "_bbxsrv._tcp.local.": [
         {
             "domain": "blebox",
@@ -930,6 +925,11 @@ ZEROCONF = {
         {
             "domain": "zha",
             "name": "xzg*",
+        },
+    ],
+    "_zenith._tcp.local.": [
+        {
+            "domain": "bang_olufsen",
         },
     ],
     "_zigate-zigbee-gateway._tcp.local.": [
