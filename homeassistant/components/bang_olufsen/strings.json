@@ -55,13 +55,13 @@
         "title": "Page",
         "description": "Create or modify a page with selected entities as buttons.",
         "data": {
-          "page_name": "Page name",
+          "page_title": "Page title",
           "entities": "Entities"
         }
       },
       "modify_page": {
         "title": "Modify page",
-        "description": "Modify the name and buttons of an existing page",
+        "description": "Modify the title and buttons of an existing page",
         "data": {
           "pages": "Pages"
         }

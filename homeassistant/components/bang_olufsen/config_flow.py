@@ -526,11 +526,10 @@ class HaloOptionsFlowHandler(OptionsFlow):
         if self._default_button is not None:
             options.append("remove_default")
             description_placeholders["button"] = self._default_button.title
+            # Check if there are any buttons available to select as default (at least 1 that is not default)
+            if len(get_all_buttons(self._configuration)) > 1:
+                options.append("select_default")
         else:
-            options.append("select_default")
-
-        # Check if there are any buttons available to select as default (at least 1 that is not default)
-        if len(get_all_buttons(self._configuration)) > 1:
             options.append("select_default")
 
         return self.async_show_menu(
