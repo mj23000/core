@@ -424,6 +424,7 @@ class HaloWebsocket(HaloBase):
 
     def _handle_number_wheel_action_callback(self, entity_state: State) -> None:
         """Handle Number entity wheel action callback."""
+
         # Add the step value
         if "step" in entity_state.attributes:
             new_number = float(entity_state.state) + (
