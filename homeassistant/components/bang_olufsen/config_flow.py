@@ -543,6 +543,9 @@ class HaloOptionsFlowHandler(OptionsFlow):
     ) -> ConfigFlowResult:
         """Select a default button."""
         if user_input is not None:
+            # Remove any previous default button
+            self._configuration = clear_default_button(self._configuration)
+
             # Update configuration with new default
             set_default_button(
                 self._configuration,

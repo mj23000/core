@@ -424,7 +424,6 @@ class HaloWebsocket(HaloBase):
 
     def _handle_number_wheel_action_callback(self, entity_state: State) -> None:
         """Handle Number entity wheel action callback."""
-
         # Add the step value
         if "step" in entity_state.attributes:
             new_number = float(entity_state.state) + (
@@ -438,20 +437,18 @@ class HaloWebsocket(HaloBase):
 
         # Clamp the value if possible
         if {"min", "max"}.issubset(entity_state.attributes):
-            new_number = int(
-                np.clip(
-                    new_number,
-                    entity_state.attributes[ATTR_MIN],
-                    entity_state.attributes[ATTR_MAX],
-                )
+            converted_state = interpolate_button_value(
+                new_number,
+                entity_state.attributes[ATTR_MIN],
+                entity_state.attributes[ATTR_MAX],
             )
 
-        if new_number == 0:
+        if converted_state == 0:
             return
 
         # Wrap action call in a task as callbacks can't be async
         asyncio.create_task(
-            self._handle_number_wheel_action_task(entity_state, new_number)
+            self._handle_number_wheel_action_task(entity_state, converted_state)
         ).done()
 
     async def _handle_number_wheel_action_task(
