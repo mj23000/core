@@ -441,7 +441,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
                 button_schema = self._button_schema()
             else:
                 button_schema = self._button_schema(
-                    self._button.title, self._button.subtitle
+                    self._button.title, self._button.subtitle, self._button.content
                 )
 
         return self.async_show_form(
@@ -656,8 +656,31 @@ class HaloOptionsFlowHandler(OptionsFlow):
         self,
         title: str | vol.Undefined = vol.UNDEFINED,
         subtitle: str = "",
+        content: Icon | Text | None = None,
     ) -> vol.Schema:
         """Fill schema for button modification or creation."""
+
+        class ExclusiveKwargs(TypedDict, total=False):
+            schema: vol.Schemable
+            group_of_exclusion: str
+            msg: str | None
+            description: str | Any
+
+        icon_kwargs: ExclusiveKwargs = {
+            "schema": CONF_ICON,
+            "group_of_exclusion": "content",
+            "msg": "Choose either an Icon or Text",
+        }
+        text_kwargs: ExclusiveKwargs = {
+            "schema": CONF_TEXT,
+            "group_of_exclusion": "content",
+            "msg": "Choose either an Icon or Text",
+        }
+        # Add suggested value to kwargs if an Icon or Text value is available
+        if isinstance(content, Icon):
+            icon_kwargs["description"] = {"suggested_value": content.icon.name}
+        elif isinstance(content, Text):
+            text_kwargs["description"] = {"suggested_value": content.text}
 
         return vol.Schema(
             {
@@ -669,16 +692,10 @@ class HaloOptionsFlowHandler(OptionsFlow):
                     str,
                     vol.Length(max=HALO_TITLE_LENGTH),
                 ),
-                vol.Exclusive(
-                    CONF_ICON,
-                    "content",
-                    "Error",
-                ): SelectSelector(SelectSelectorConfig(options=HALO_BUTTON_ICONS)),
-                vol.Exclusive(
-                    CONF_TEXT,
-                    "content",
-                    "Error",
-                ): vol.All(
+                vol.Exclusive(**icon_kwargs): SelectSelector(
+                    SelectSelectorConfig(options=HALO_BUTTON_ICONS)
+                ),
+                vol.Exclusive(**text_kwargs): vol.All(
                     str,
                     vol.Length(max=HALO_TEXT_LENGTH),
                 ),

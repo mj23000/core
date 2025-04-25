@@ -68,7 +68,7 @@
       },
       "button": {
         "title": "Configure button",
-        "description": "Select a configuration for the {entity} button in the {page} page",
+        "description": "Select a configuration for the {entity} button in the {page} page. Icon and Text can't both be defined, but one of them is required",
         "data": {
           "icon": "Icon",
           "text": "Text",
