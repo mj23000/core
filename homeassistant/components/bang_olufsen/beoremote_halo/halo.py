@@ -56,7 +56,7 @@ class Halo:
 
         self._websocket_active = False
         self._websocket_task: asyncio.Task
-        self._queue: asyncio.Queue[str] = asyncio.Queue()
+        self._queue: asyncio.Queue[str] | None = None
         self._on_connection_lost: Callable[[None], Awaitable[None] | None] | None = None
         self._on_connection: Callable[[None], Awaitable[None] | None] | None = None
 
@@ -78,7 +78,7 @@ class Halo:
             If the data was successfully put into WebSocket queue.
 
         """
-        if not self._websocket_active:
+        if self._queue is None:
             self._logger.debug(
                 "Unable to send %s. WebSocket connection not active", data
             )
@@ -86,7 +86,8 @@ class Halo:
 
         try:
             self._queue.put_nowait(str(data.to_json()))
-        except (asyncio.QueueFull, asyncio.QueueShutDown):
+        except (asyncio.QueueFull, asyncio.QueueShutDown) as e:
+            self._logger.debug("Unable to send data: %s with error: %s", data, e)
             return False
         else:
             return True
@@ -204,6 +205,9 @@ class Halo:
     async def disconnect(self) -> None:
         """Stop WebSocket connection."""
         self._websocket_active = False
+        if self._queue is not None:
+            self._queue.shutdown(True)
+            self._queue = None
         self._websocket_task.cancel()
 
     async def _websocket_connection(
@@ -228,6 +232,9 @@ class Halo:
                 ):
                     self.websocket_connected = True
 
+                    # Start queue
+                    self._queue = asyncio.Queue()
+
                     # Send configuration
                     if send_configuration:
                         self._send_data(self._configuration)
@@ -242,7 +249,7 @@ class Halo:
                             await self._on_message(event)
 
                         # Send updates
-                        with contextlib.suppress(asyncio.QueueEmpty):
+                        if not self._queue.empty():
                             await websocket.send_str(self._queue.get_nowait())
 
                     self.websocket_connected = False
@@ -256,6 +263,11 @@ class Halo:
                 ServerTimeoutError,
                 WSMessageTypeError,
             ) as error:
+                # Stop the queue while the WebSocket connection is inactive
+                if self._queue is not None:
+                    self._queue.shutdown(True)
+                    self._queue = None
+
                 if self.websocket_connected:
                     self._logger.debug("%s : %s - %s", host, type(error), error)
                     self.websocket_connected = False
