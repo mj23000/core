@@ -450,6 +450,9 @@ class HaloOptionsFlowHandler(OptionsFlow):
                     ),
                 )
 
+        # Reverse the entity_ids list to match the order of creation/modification match the Halo's display order
+        self._entity_ids.reverse()
+
         if not self._page_being_modified:
             button_schema = self._button_schema()
         # Add current values as "default" values if page is being modified
