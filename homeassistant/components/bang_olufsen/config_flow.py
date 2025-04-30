@@ -363,6 +363,9 @@ class HaloOptionsFlowHandler(OptionsFlow):
         if user_input is not None:
             self._entity_ids = user_input[CONF_ENTITIES]
 
+            # Reverse the entity_ids list to match the order of creation/modification match the Halo's display order
+            self._entity_ids.reverse()
+
             # Don't create a new page if an existing page is being modified
             if not self._page_being_modified:
                 self._page = Page(user_input[CONF_PAGE_TITLE], [], id=self._halo_uuid())
@@ -450,14 +453,12 @@ class HaloOptionsFlowHandler(OptionsFlow):
                     ),
                 )
 
-        # Reverse the entity_ids list to match the order of creation/modification match the Halo's display order
-        self._entity_ids.reverse()
-
         if not self._page_being_modified:
             button_schema = self._button_schema()
         # Add current values as "default" values if page is being modified
         else:
             # Get current button attributes from entity_map and page
+            self._button = None
             for button in self._page.buttons:
                 if self._entity_map[button.id] == self._entity_ids[-1]:
                     self._button = button
