@@ -13,18 +13,20 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
 from .const import (
-    TEST_DATA_CREATE_ENTRY,
-    TEST_DATA_USER,
-    TEST_DATA_USER_INVALID,
-    TEST_DATA_ZEROCONF,
-    TEST_DATA_ZEROCONF_IPV6,
-    TEST_DATA_ZEROCONF_NOT_MOZART,
+    TEST_HALO_DATA_CREATE_ENTRY,
+    TEST_HALO_DATA_ZEROCONF,
+    TEST_MOZART_DATA_CREATE_ENTRY,
+    TEST_MOZART_DATA_USER,
+    TEST_MOZART_DATA_USER_INVALID,
+    TEST_MOZART_DATA_ZEROCONF,
+    TEST_MOZART_DATA_ZEROCONF_IPV6,
+    TEST_MOZART_DATA_ZEROCONF_NOT_MOZART,
 )
 
 pytestmark = pytest.mark.usefixtures("mock_setup_entry")
 
 
-async def test_config_flow_timeout_error(
+async def test_mozart_config_flow_timeout_error(
     hass: HomeAssistant, mock_mozart_client: AsyncMock
 ) -> None:
     """Test we handle timeout_error."""
@@ -33,7 +35,7 @@ async def test_config_flow_timeout_error(
     result_user = await hass.config_entries.flow.async_init(
         handler=DOMAIN,
         context={CONF_SOURCE: SOURCE_USER},
-        data=TEST_DATA_USER,
+        data=TEST_MOZART_DATA_USER,
     )
     assert result_user["type"] is FlowResultType.FORM
     assert result_user["errors"] == {"base": "timeout_error"}
@@ -41,7 +43,7 @@ async def test_config_flow_timeout_error(
     assert mock_mozart_client.get_beolink_self.call_count == 1
 
 
-async def test_config_flow_client_connector_error(
+async def test_mozart_config_flow_client_connector_error(
     hass: HomeAssistant, mock_mozart_client: AsyncMock
 ) -> None:
     """Test we handle client_connector_error."""
@@ -52,7 +54,7 @@ async def test_config_flow_client_connector_error(
     result_user = await hass.config_entries.flow.async_init(
         handler=DOMAIN,
         context={CONF_SOURCE: SOURCE_USER},
-        data=TEST_DATA_USER,
+        data=TEST_MOZART_DATA_USER,
     )
     assert result_user["type"] is FlowResultType.FORM
     assert result_user["errors"] == {"base": "client_connector_error"}
@@ -60,19 +62,19 @@ async def test_config_flow_client_connector_error(
     assert mock_mozart_client.get_beolink_self.call_count == 1
 
 
-async def test_config_flow_invalid_ip(hass: HomeAssistant) -> None:
+async def test_mozart_config_flow_invalid_ip(hass: HomeAssistant) -> None:
     """Test we handle invalid_ip."""
 
     result_user = await hass.config_entries.flow.async_init(
         handler=DOMAIN,
         context={CONF_SOURCE: SOURCE_USER},
-        data=TEST_DATA_USER_INVALID,
+        data=TEST_MOZART_DATA_USER_INVALID,
     )
     assert result_user["type"] is FlowResultType.FORM
     assert result_user["errors"] == {"base": "invalid_ip"}
 
 
-async def test_config_flow_api_exception(
+async def test_mozart_config_flow_api_exception(
     hass: HomeAssistant, mock_mozart_client: AsyncMock
 ) -> None:
     """Test we handle api_exception."""
@@ -81,7 +83,7 @@ async def test_config_flow_api_exception(
     result_user = await hass.config_entries.flow.async_init(
         handler=DOMAIN,
         context={CONF_SOURCE: SOURCE_USER},
-        data=TEST_DATA_USER,
+        data=TEST_MOZART_DATA_USER,
     )
     assert result_user["type"] is FlowResultType.FORM
     assert result_user["errors"] == {"base": "api_exception"}
@@ -89,7 +91,9 @@ async def test_config_flow_api_exception(
     assert mock_mozart_client.get_beolink_self.call_count == 1
 
 
-async def test_config_flow(hass: HomeAssistant, mock_mozart_client: AsyncMock) -> None:
+async def test_mozart_config_flow(
+    hass: HomeAssistant, mock_mozart_client: AsyncMock
+) -> None:
     """Test config flow."""
 
     result_init = await hass.config_entries.flow.async_init(
@@ -103,47 +107,48 @@ async def test_config_flow(hass: HomeAssistant, mock_mozart_client: AsyncMock) -
 
     result_user = await hass.config_entries.flow.async_configure(
         flow_id=result_init["flow_id"],
-        user_input=TEST_DATA_USER,
+        user_input=TEST_MOZART_DATA_USER,
     )
 
     assert result_user["type"] is FlowResultType.CREATE_ENTRY
-    assert result_user["data"] == TEST_DATA_CREATE_ENTRY
+    assert result_user["data"] == TEST_MOZART_DATA_CREATE_ENTRY
 
     assert mock_mozart_client.get_beolink_self.call_count == 1
 
 
-async def test_config_flow_zeroconf(
+async def test_mozart_config_flow_zeroconf(
     hass: HomeAssistant, mock_mozart_client: AsyncMock
 ) -> None:
-    """Test zeroconf discovery."""
+    """Test Mozart zeroconf discovery."""
 
     result_zeroconf = await hass.config_entries.flow.async_init(
         handler=DOMAIN,
         context={CONF_SOURCE: SOURCE_ZEROCONF},
-        data=TEST_DATA_ZEROCONF,
+        data=TEST_MOZART_DATA_ZEROCONF,
     )
 
     assert result_zeroconf["type"] is FlowResultType.FORM
     assert result_zeroconf["step_id"] == "zeroconf_confirm"
 
     result_confirm = await hass.config_entries.flow.async_configure(
-        flow_id=result_zeroconf["flow_id"],
-        user_input=TEST_DATA_USER,
+        flow_id=result_zeroconf["flow_id"], user_input={}
     )
 
     assert result_confirm["type"] is FlowResultType.CREATE_ENTRY
-    assert result_confirm["data"] == TEST_DATA_CREATE_ENTRY
+    assert result_confirm["data"] == TEST_MOZART_DATA_CREATE_ENTRY
 
     assert mock_mozart_client.get_beolink_self.call_count == 1
 
 
-async def test_config_flow_zeroconf_not_mozart_device(hass: HomeAssistant) -> None:
+async def test_config_flow_zeroconf_not_mozart_device(
+    hass: HomeAssistant,
+) -> None:
     """Test zeroconf discovery of invalid device."""
 
     result_user = await hass.config_entries.flow.async_init(
         handler=DOMAIN,
         context={CONF_SOURCE: SOURCE_ZEROCONF},
-        data=TEST_DATA_ZEROCONF_NOT_MOZART,
+        data=TEST_MOZART_DATA_ZEROCONF_NOT_MOZART,
     )
 
     assert result_user["type"] is FlowResultType.ABORT
@@ -156,7 +161,7 @@ async def test_config_flow_zeroconf_ipv6(hass: HomeAssistant) -> None:
     result_user = await hass.config_entries.flow.async_init(
         handler=DOMAIN,
         context={CONF_SOURCE: SOURCE_ZEROCONF},
-        data=TEST_DATA_ZEROCONF_IPV6,
+        data=TEST_MOZART_DATA_ZEROCONF_IPV6,
     )
 
     assert result_user["type"] is FlowResultType.ABORT
@@ -174,8 +179,28 @@ async def test_config_flow_zeroconf_invalid_ip(
     result_user = await hass.config_entries.flow.async_init(
         handler=DOMAIN,
         context={CONF_SOURCE: SOURCE_ZEROCONF},
-        data=TEST_DATA_ZEROCONF,
+        data=TEST_MOZART_DATA_ZEROCONF,
     )
 
     assert result_user["type"] is FlowResultType.ABORT
     assert result_user["reason"] == "invalid_address"
+
+
+async def test_halo_config_flow_zeroconf(hass: HomeAssistant) -> None:
+    """Test Halo zeroconf discovery."""
+
+    result_zeroconf = await hass.config_entries.flow.async_init(
+        handler=DOMAIN,
+        context={CONF_SOURCE: SOURCE_ZEROCONF},
+        data=TEST_HALO_DATA_ZEROCONF,
+    )
+
+    assert result_zeroconf["type"] is FlowResultType.FORM
+    assert result_zeroconf["step_id"] == "zeroconf_confirm"
+
+    result_confirm = await hass.config_entries.flow.async_configure(
+        flow_id=result_zeroconf["flow_id"], user_input={}
+    )
+
+    assert result_confirm["type"] is FlowResultType.CREATE_ENTRY
+    assert result_confirm["data"] == TEST_HALO_DATA_CREATE_ENTRY

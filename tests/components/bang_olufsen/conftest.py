@@ -36,8 +36,6 @@ from homeassistant.components.bang_olufsen.const import DOMAIN
 from homeassistant.core import HomeAssistant
 
 from .const import (
-    TEST_DATA_CREATE_ENTRY,
-    TEST_DATA_CREATE_ENTRY_2,
     TEST_FRIENDLY_NAME,
     TEST_FRIENDLY_NAME_3,
     TEST_FRIENDLY_NAME_4,
@@ -46,7 +44,9 @@ from .const import (
     TEST_JID_1,
     TEST_JID_3,
     TEST_JID_4,
-    TEST_NAME,
+    TEST_MOZART_DATA_CREATE_ENTRY,
+    TEST_MOZART_DATA_CREATE_ENTRY_2,
+    TEST_MOZART_NAME,
     TEST_NAME_2,
     TEST_REMOTE_SERIAL,
     TEST_SERIAL_NUMBER,
@@ -65,8 +65,8 @@ def mock_config_entry() -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
         unique_id=TEST_SERIAL_NUMBER,
-        data=TEST_DATA_CREATE_ENTRY,
-        title=TEST_NAME,
+        data=TEST_MOZART_DATA_CREATE_ENTRY,
+        title=TEST_MOZART_NAME,
     )
 
 
@@ -76,7 +76,7 @@ def mock_config_entry_core() -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
         unique_id=TEST_SERIAL_NUMBER_2,
-        data=TEST_DATA_CREATE_ENTRY_2,
+        data=TEST_MOZART_DATA_CREATE_ENTRY_2,
         title=TEST_NAME_2,
     )
 
@@ -468,6 +468,30 @@ def mock_mozart_client() -> Generator[AsyncMock]:
         # WebSocket listener
         client.connect_notifications = AsyncMock()
         client.disconnect_notifications = Mock()
+        client.websocket_connected = False
+
+        yield client
+
+
+@pytest.fixture
+def mock_halo_client() -> Generator[AsyncMock]:
+    """Mock Halo."""
+    with (
+        patch(
+            "homeassistant.components.bang_olufsen.Halo", autospec=True
+        ) as mock_client,
+        patch(
+            "homeassistant.components.bang_olufsen.config_flow.Halo",
+            new=mock_client,
+        ),
+    ):
+        client = mock_client.return_value
+
+        # WebSocket methods
+        client.update = AsyncMock()
+        client.check_device_connection = AsyncMock()
+        client.connect = AsyncMock()
+        client.disconnect = AsyncMock()
         client.websocket_connected = False
 
         yield client

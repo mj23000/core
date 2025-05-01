@@ -28,11 +28,11 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.const import (
-    ATTR_NAME,
     CONF_ENTITIES,
     CONF_HOST,
     CONF_ICON,
     CONF_MODEL,
+    CONF_NAME,
 )
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
@@ -217,7 +217,7 @@ class BangOlufsenConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         # Handle Beoremote Halo
         elif discovery_info.type == ZEROCONF_HALO:
             self._zeroconf_halo(discovery_info)
-            name_key = ATTR_NAME
+            name_key = CONF_NAME
 
         await self.async_set_unique_id(self._serial_number)
         self._abort_if_unique_id_configured(updates={CONF_HOST: self._host})
