@@ -104,7 +104,8 @@ class BangOlufsenEntryData(TypedDict, total=False):
     # Mozart
     jid: str
     # Halo
-    # Does not seem to handle objects well through restarts
+    # Does not seem to handle objects well through restarts,
+    # so a dict of the configuration is stored instead
     halo: dict | None
     entity_map: dict[str, str]
 

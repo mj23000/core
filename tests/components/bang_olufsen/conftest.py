@@ -36,17 +36,21 @@ from homeassistant.components.bang_olufsen.const import DOMAIN
 from homeassistant.core import HomeAssistant
 
 from .const import (
+    TEST_DATA_CREATE_ENTRY,
+    TEST_DATA_CREATE_ENTRY_2,
     TEST_FRIENDLY_NAME,
     TEST_FRIENDLY_NAME_3,
     TEST_FRIENDLY_NAME_4,
+    TEST_HALO_DATA_CREATE_ENTRY,
+    TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION,
+    TEST_HALO_NAME,
+    TEST_HALO_SERIAL,
     TEST_HOST_3,
     TEST_HOST_4,
     TEST_JID_1,
     TEST_JID_3,
     TEST_JID_4,
-    TEST_MOZART_DATA_CREATE_ENTRY,
-    TEST_MOZART_DATA_CREATE_ENTRY_2,
-    TEST_MOZART_NAME,
+    TEST_NAME,
     TEST_NAME_2,
     TEST_REMOTE_SERIAL,
     TEST_SERIAL_NUMBER,
@@ -65,8 +69,8 @@ def mock_config_entry() -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
         unique_id=TEST_SERIAL_NUMBER,
-        data=TEST_MOZART_DATA_CREATE_ENTRY,
-        title=TEST_MOZART_NAME,
+        data=TEST_DATA_CREATE_ENTRY,
+        title=TEST_NAME,
     )
 
 
@@ -76,8 +80,20 @@ def mock_config_entry_core() -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
         unique_id=TEST_SERIAL_NUMBER_2,
-        data=TEST_MOZART_DATA_CREATE_ENTRY_2,
+        data=TEST_DATA_CREATE_ENTRY_2,
         title=TEST_NAME_2,
+    )
+
+
+@pytest.fixture
+def mock_config_entry_halo() -> MockConfigEntry:
+    """Mock config entry for Beoremote Halo."""
+    return MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=TEST_HALO_SERIAL,
+        data=TEST_HALO_DATA_CREATE_ENTRY,
+        options=TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION,
+        title=TEST_HALO_NAME,
     )
 
 
@@ -129,6 +145,21 @@ async def integration_fixture(
     await mock_websocket_connection(hass, mock_mozart_client)
 
     return (mock_config_entry, mock_mozart_client)
+
+
+@pytest.fixture(name="integration_halo")
+async def integration_halo_fixture(
+    hass: HomeAssistant,
+    mock_halo_client: AsyncMock,
+    mock_config_entry_halo: MockConfigEntry,
+) -> tuple[MockConfigEntry, AsyncMock]:
+    """Set up the Bang & Olufsen integration with A Beoremote Halo with initial configuration."""
+
+    mock_config_entry_halo.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry_halo.entry_id)
+    await hass.async_block_till_done()
+
+    return (mock_config_entry_halo, mock_halo_client)
 
 
 @pytest.fixture
@@ -476,15 +507,9 @@ def mock_mozart_client() -> Generator[AsyncMock]:
 @pytest.fixture
 def mock_halo_client() -> Generator[AsyncMock]:
     """Mock Halo."""
-    with (
-        patch(
-            "homeassistant.components.bang_olufsen.Halo", autospec=True
-        ) as mock_client,
-        patch(
-            "homeassistant.components.bang_olufsen.config_flow.Halo",
-            new=mock_client,
-        ),
-    ):
+    with patch(
+        "homeassistant.components.bang_olufsen.Halo", autospec=True
+    ) as mock_client:
         client = mock_client.return_value
 
         # WebSocket methods

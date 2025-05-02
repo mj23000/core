@@ -23,6 +23,7 @@ from mozart_api.models import (
     VolumeState,
 )
 
+from homeassistant.components.bang_olufsen.beoremote_halo.models import Icons
 from homeassistant.components.bang_olufsen.const import (
     ATTR_FRIENDLY_NAME,
     ATTR_HALO_SERIAL_NUMBER,
@@ -30,10 +31,21 @@ from homeassistant.components.bang_olufsen.const import (
     ATTR_MOZART_SERIAL_NUMBER,
     ATTR_TYPE_NUMBER,
     CONF_BEOLINK_JID,
+    CONF_ENTITY_MAP,
     CONF_HALO,
+    CONF_PAGE_TITLE,
+    CONF_PAGES,
+    CONF_TEXT,
+    CONF_TITLE,
     BangOlufsenSource,
 )
-from homeassistant.const import CONF_HOST, CONF_MODEL, CONF_NAME
+from homeassistant.const import (
+    CONF_ENTITIES,
+    CONF_HOST,
+    CONF_ICON,
+    CONF_MODEL,
+    CONF_NAME,
+)
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 # Device models
@@ -51,7 +63,7 @@ TEST_ITEM_NUMBER = "1111111"
 TEST_TYPE_NUMBER = "1111"
 TEST_JID_1 = f"{TEST_TYPE_NUMBER}.{TEST_ITEM_NUMBER}.{TEST_SERIAL_NUMBER}@products.bang-olufsen.com"
 TEST_MEDIA_PLAYER_ENTITY_ID = "media_player.beosound_balance_11111111"
-TEST_MOZART_NAME = f"{TEST_MODEL_BALANCE}-{TEST_SERIAL_NUMBER}"
+TEST_NAME = f"{TEST_MODEL_BALANCE}-{TEST_SERIAL_NUMBER}"
 
 TEST_BUTTON_EVENT_ENTITY_ID = "event.beosound_balance_11111111_play_pause"
 
@@ -85,16 +97,20 @@ TEST_REMOTE_KEY_EVENT_ENTITY_ID = "event.beoremote_one_55555555_11111111_control
 # Beoremote Halo
 TEST_HALO_SERIAL = "66666666"
 TEST_HALO_NAME = f"Beoremote Halo-{TEST_HALO_SERIAL}"
+TEST_HALO_BATTERY_SENSOR_ENTITY_ID = (
+    f"sensor.beoremote_halo_{TEST_HALO_SERIAL}_battery_level"
+)
+TEST_HALO_BATTERY_CHARGING_BINARY_SENSOR_ENTITY_ID = (
+    f"binary_sensor.beoremote_halo_{TEST_HALO_SERIAL}_battery_charging"
+)
 
 # Config flow
 TEST_HOST_INVALID = "192.168.0"
 TEST_HOST_IPV6 = "1111:2222:3333:4444:5555:6666:7777:8888"
 
-TEST_MOZART_HOSTNAME_ZEROCONF = TEST_MOZART_NAME.replace(" ", "-") + ".local."
-TEST_MOZART_TYPE_ZEROCONF = "_bangolufsen._tcp.local."
-TEST_MOZART_NAME_ZEROCONF = (
-    TEST_MOZART_NAME.replace(" ", "-") + "." + TEST_MOZART_TYPE_ZEROCONF
-)
+TEST_HOSTNAME_ZEROCONF = TEST_NAME.replace(" ", "-") + ".local."
+TEST_TYPE_ZEROCONF = "_bangolufsen._tcp.local."
+TEST_NAME_ZEROCONF = TEST_NAME.replace(" ", "-") + "." + TEST_TYPE_ZEROCONF
 
 TEST_HALO_HOSTNAME_ZEROCONF = f"BeoremoteHalo-{TEST_HALO_SERIAL}.local"
 TEST_HALO_TYPE_ZEROCONF = "_zenith._tcp.local."
@@ -102,20 +118,20 @@ TEST_HALO_NAME_ZEROCONF = (
     f"BeoremoteHalo-{TEST_SERIAL_NUMBER}.{TEST_HALO_TYPE_ZEROCONF}"
 )
 
-TEST_MOZART_DATA_USER = {CONF_HOST: TEST_HOST, CONF_MODEL: TEST_MODEL_BALANCE}
-TEST_MOZART_DATA_USER_INVALID = {
+TEST_DATA_USER = {CONF_HOST: TEST_HOST, CONF_MODEL: TEST_MODEL_BALANCE}
+TEST_DATA_USER_INVALID = {
     CONF_HOST: TEST_HOST_INVALID,
     CONF_MODEL: TEST_MODEL_BALANCE,
 }
 
-TEST_MOZART_DATA_CREATE_ENTRY = {
+TEST_DATA_CREATE_ENTRY = {
     CONF_HOST: TEST_HOST,
     CONF_MODEL: TEST_MODEL_BALANCE,
     CONF_BEOLINK_JID: TEST_JID_1,
-    CONF_NAME: TEST_MOZART_NAME,
+    CONF_NAME: TEST_NAME,
     CONF_HALO: None,
 }
-TEST_MOZART_DATA_CREATE_ENTRY_2 = {
+TEST_DATA_CREATE_ENTRY_2 = {
     CONF_HOST: TEST_HOST_2,
     CONF_MODEL: TEST_MODEL_CORE,
     CONF_BEOLINK_JID: TEST_JID_2,
@@ -131,13 +147,118 @@ TEST_HALO_DATA_CREATE_ENTRY = {
     CONF_HALO: None,
 }
 
-TEST_MOZART_DATA_ZEROCONF = ZeroconfServiceInfo(
+# Halo config flow options
+TEST_HALO_PAGE_TITLE = "Test page"
+TEST_HALO_PAGE_ENTITIES = [TEST_HALO_BATTERY_SENSOR_ENTITY_ID]
+TEST_HALO_DATA_PAGE = {
+    CONF_PAGE_TITLE: TEST_HALO_PAGE_TITLE,
+    CONF_ENTITIES: TEST_HALO_PAGE_ENTITIES,
+}
+TEST_HALO_DATA_BUTTON = {
+    CONF_TITLE: "Battery",
+    CONF_ICON: Icons.ENERGIZE.name,
+}
+TEST_HALO_DATA_BUTTON_MODIFIED = {
+    CONF_TITLE: "Battery",
+    CONF_TEXT: "%",
+}
+TEST_HALO_DATA_BUTTON_2 = {
+    # String limit of 15
+    CONF_TITLE: "Bat. Charging",
+    CONF_ICON: Icons.BATH_TUB.name,
+}
+TEST_HALO_DATA_CONFIGURATION = {
+    "configuration": {
+        "pages": [
+            {
+                "title": TEST_HALO_PAGE_TITLE,
+                "buttons": [
+                    {
+                        "title": TEST_HALO_DATA_BUTTON[CONF_TITLE],
+                        "content": {"icon": Icons.ENERGIZE.value},
+                        "subtitle": "",
+                        "value": 0,
+                        "state": "inactive",
+                        "default": False,
+                        "id": "cf7a7540-fac2-aee2-ad95-1a7f90ac29f1",
+                    },
+                ],
+                "id": "c45c74b4-3c39-6c87-f858-22b24dc2ad8b",
+            }
+        ],
+        "version": "2.0.0",
+        "id": "8f1b81fe-2748-11f0-b515-d0abd5978ec0",
+    }
+}
+TEST_HALO_DATA_CONFIGURATION_TWO_BUTTONS = {
+    "configuration": {
+        "pages": [
+            {
+                "title": TEST_HALO_PAGE_TITLE,
+                "buttons": [
+                    {
+                        "title": TEST_HALO_DATA_BUTTON[CONF_TITLE],
+                        "content": {"icon": Icons.ENERGIZE.value},
+                        "subtitle": "",
+                        "value": 0,
+                        "state": "inactive",
+                        "default": False,
+                        "id": "cf7a7540-fac2-aee2-ad95-1a7f90ac29f1",
+                    },
+                    {
+                        "title": TEST_HALO_DATA_BUTTON_2[CONF_TITLE],
+                        "content": {"icon": Icons.BATH_TUB.value},
+                        "subtitle": "",
+                        "value": 0,
+                        "state": "inactive",
+                        "default": False,
+                        "id": "cf7a7540-fac2-aee2-ad95-1a7f90ac29f2",
+                    },
+                ],
+                "id": "c45c74b4-3c39-6c87-f858-22b24dc2ad8b",
+            }
+        ],
+        "version": "2.0.0",
+        "id": "8f1b81fe-2748-11f0-b515-d0abd5978ec0",
+    }
+}
+TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION = {
+    CONF_HOST: TEST_HOST,
+    CONF_MODEL: TEST_MODEL_HALO,
+    CONF_NAME: TEST_HALO_NAME,
+    CONF_HALO: TEST_HALO_DATA_CONFIGURATION,
+    CONF_ENTITY_MAP: {
+        "cf7a7540-fac2-aee2-ad95-1a7f90ac29f1": TEST_HALO_BATTERY_SENSOR_ENTITY_ID
+    },
+}
+TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_TWO_BUTTONS = {
+    CONF_HOST: TEST_HOST,
+    CONF_MODEL: TEST_MODEL_HALO,
+    CONF_NAME: TEST_HALO_NAME,
+    CONF_HALO: TEST_HALO_DATA_CONFIGURATION_TWO_BUTTONS,
+    CONF_ENTITY_MAP: {
+        "cf7a7540-fac2-aee2-ad95-1a7f90ac29f1": TEST_HALO_BATTERY_SENSOR_ENTITY_ID,
+        "cf7a7540-fac2-aee2-ad95-1a7f90ac29f2": TEST_HALO_BATTERY_CHARGING_BINARY_SENSOR_ENTITY_ID,
+    },
+}
+TEST_HALO_DATA_SELECT_PAGE = {
+    CONF_PAGES: f"{TEST_HALO_PAGE_TITLE} - (c45c74b4-3c39-6c87-f858-22b24dc2ad8b)"
+}
+TEST_HALO_DATA_PAGE_TWO_BUTTONS = {
+    CONF_PAGE_TITLE: TEST_HALO_PAGE_TITLE,
+    CONF_ENTITIES: [
+        TEST_HALO_BATTERY_SENSOR_ENTITY_ID,
+        TEST_HALO_BATTERY_CHARGING_BINARY_SENSOR_ENTITY_ID,
+    ],
+}
+
+TEST_DATA_ZEROCONF = ZeroconfServiceInfo(
     ip_address=IPv4Address(TEST_HOST),
     ip_addresses=[IPv4Address(TEST_HOST)],
     port=80,
-    hostname=TEST_MOZART_HOSTNAME_ZEROCONF,
-    type=TEST_MOZART_TYPE_ZEROCONF,
-    name=TEST_MOZART_NAME_ZEROCONF,
+    hostname=TEST_HOSTNAME_ZEROCONF,
+    type=TEST_TYPE_ZEROCONF,
+    name=TEST_NAME_ZEROCONF,
     properties={
         ATTR_FRIENDLY_NAME: TEST_FRIENDLY_NAME,
         ATTR_MOZART_SERIAL_NUMBER: TEST_SERIAL_NUMBER,
@@ -146,23 +267,23 @@ TEST_MOZART_DATA_ZEROCONF = ZeroconfServiceInfo(
     },
 )
 
-TEST_MOZART_DATA_ZEROCONF_NOT_MOZART = ZeroconfServiceInfo(
+TEST_DATA_ZEROCONF_NOT_MOZART = ZeroconfServiceInfo(
     ip_address=IPv4Address(TEST_HOST),
     ip_addresses=[IPv4Address(TEST_HOST)],
     port=80,
-    hostname=TEST_MOZART_HOSTNAME_ZEROCONF,
-    type=TEST_MOZART_TYPE_ZEROCONF,
-    name=TEST_MOZART_NAME_ZEROCONF,
+    hostname=TEST_HOSTNAME_ZEROCONF,
+    type=TEST_TYPE_ZEROCONF,
+    name=TEST_NAME_ZEROCONF,
     properties={ATTR_MOZART_SERIAL_NUMBER: TEST_SERIAL_NUMBER},
 )
 
-TEST_MOZART_DATA_ZEROCONF_IPV6 = ZeroconfServiceInfo(
+TEST_DATA_ZEROCONF_IPV6 = ZeroconfServiceInfo(
     ip_address=IPv6Address(TEST_HOST_IPV6),
     ip_addresses=[IPv6Address(TEST_HOST_IPV6)],
     port=80,
-    hostname=TEST_MOZART_HOSTNAME_ZEROCONF,
-    type=TEST_MOZART_TYPE_ZEROCONF,
-    name=TEST_MOZART_NAME_ZEROCONF,
+    hostname=TEST_HOSTNAME_ZEROCONF,
+    type=TEST_TYPE_ZEROCONF,
+    name=TEST_NAME_ZEROCONF,
     properties={
         ATTR_FRIENDLY_NAME: TEST_FRIENDLY_NAME,
         ATTR_MOZART_SERIAL_NUMBER: TEST_SERIAL_NUMBER,
