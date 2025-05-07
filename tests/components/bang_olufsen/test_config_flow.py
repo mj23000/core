@@ -21,23 +21,20 @@ from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
 from .const import (
-    CONF_ENTITY_MAP,
-    CONF_HALO,
-    CONF_TEXT,
     TEST_DATA_CREATE_ENTRY,
     TEST_DATA_USER,
     TEST_DATA_USER_INVALID,
     TEST_DATA_ZEROCONF,
     TEST_DATA_ZEROCONF_IPV6,
     TEST_DATA_ZEROCONF_NOT_MOZART,
-    TEST_HALO_BATTERY_CHARGING_BINARY_SENSOR_ENTITY_ID,
-    TEST_HALO_BATTERY_SENSOR_ENTITY_ID,
+    TEST_HALO_BUTTON_2_ID,
     TEST_HALO_DATA_BUTTON,
     TEST_HALO_DATA_BUTTON_2,
     TEST_HALO_DATA_BUTTON_MODIFIED,
     TEST_HALO_DATA_CREATE_ENTRY,
     TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION,
     TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_DEFAULT,
+    TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_MODIFIED,
     TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_TWO_BUTTONS,
     TEST_HALO_DATA_PAGE,
     TEST_HALO_DATA_PAGE_TWO_BUTTONS,
@@ -47,9 +44,10 @@ from .const import (
     TEST_HALO_NAME,
     TEST_HALO_PAGE,
     TEST_HALO_SERIAL,
+    TEST_HALO_UUID_TARGET,
 )
 
-from tests.common import ANY, MockConfigEntry
+from tests.common import MockConfigEntry, patch
 
 pytestmark = pytest.mark.usefixtures("mock_setup_entry")
 
@@ -216,12 +214,19 @@ async def test_config_flow_zeroconf_invalid_ip(
 
 
 async def test_config_flow_options_mozart(
-    hass: HomeAssistant, integration: tuple[MockConfigEntry, AsyncMock]
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
 ) -> None:
     """Test Mozart options."""
-    config_entry, client = integration
+    # Setup entry
+    mock_config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
 
-    result_options = await hass.config_entries.options.async_init(config_entry.entry_id)
+    result_options = await hass.config_entries.options.async_init(
+        mock_config_entry.entry_id
+    )
+
     assert result_options["type"] is FlowResultType.ABORT
     assert result_options["reason"] == "invalid_model"
 
@@ -249,7 +254,9 @@ async def test_halo_config_flow_zeroconf(hass: HomeAssistant) -> None:
     assert result_confirm["data"] == TEST_HALO_DATA_CREATE_ENTRY
 
 
-async def test_halo_config_flow_options_add_page(hass: HomeAssistant) -> None:
+async def test_halo_config_flow_options_add_page(
+    hass: HomeAssistant, mock_halo_uuid: AsyncMock
+) -> None:
     """Test Halo options by adding a page with one button."""
     # Setup Halo
     config_entry = MockConfigEntry(
@@ -286,107 +293,18 @@ async def test_halo_config_flow_options_add_page(hass: HomeAssistant) -> None:
     assert result_page["step_id"] == "button"
 
     # Configure button
-    # Add ANY to "id" in entry to make it pass
-    halo_data = TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION
-    halo_data[CONF_ENTITY_MAP] = ANY
-    halo_data[CONF_HALO]["configuration"]["id"] = ANY
-    halo_data[CONF_HALO]["configuration"]["pages"][0]["id"] = ANY
-    halo_data[CONF_HALO]["configuration"]["pages"][0]["buttons"][0]["id"] = ANY
-
     result_button = await hass.config_entries.options.async_configure(
         flow_id=result_page["flow_id"],
         user_input=TEST_HALO_DATA_BUTTON,
     )
     assert result_button["type"] is FlowResultType.CREATE_ENTRY
-    assert result_button["data"] == halo_data
-
-    # Check entity_map
-    assert (
-        TEST_HALO_BATTERY_SENSOR_ENTITY_ID
-        in result_button["data"][CONF_ENTITY_MAP].values()
-    )
-
-
-async def test_halo_config_flow_options_add_buttons(
-    hass: HomeAssistant, integration_halo: tuple[MockConfigEntry, AsyncMock]
-) -> None:
-    """Test Halo options by adding 2 buttons to an existing page."""
-    config_entry, client = integration_halo
-
-    # Start options
-    result_init = await hass.config_entries.options.async_init(config_entry.entry_id)
-    assert result_init["type"] is FlowResultType.MENU
-    assert result_init["step_id"] == "init"
-    # Ensure only the expected options are available
-    assert result_init["menu_options"] == [
-        HALO_OPTION_PAGE,
-        HALO_OPTION_MODIFY_PAGE,
-        HALO_OPTION_DELETE_PAGES,
-        HALO_OPTION_MODIFY_DEFAULT,
-    ]
-    # Select "Modify an existing page"
-    result_options = await hass.config_entries.options.async_configure(
-        flow_id=result_init["flow_id"],
-        user_input={"next_step_id": HALO_OPTION_MODIFY_PAGE},
-    )
-    assert result_options["type"] is FlowResultType.FORM
-    assert result_options["step_id"] == HALO_OPTION_MODIFY_PAGE
-    # Ensure only the expected options are available
-    assert result_options["data_schema"].schema["pages"].config["options"] == [
-        TEST_HALO_PAGE
-    ]
-
-    # Select page
-    result_page = await hass.config_entries.options.async_configure(
-        flow_id=result_options["flow_id"],
-        user_input=TEST_HALO_DATA_SELECT_PAGE,
-    )
-    assert result_page["type"] is FlowResultType.FORM
-    assert result_page["step_id"] == HALO_OPTION_PAGE
-
-    # Add an additional button
-    result_modify_page = await hass.config_entries.options.async_configure(
-        flow_id=result_page["flow_id"],
-        user_input=TEST_HALO_DATA_PAGE_TWO_BUTTONS,
-    )
-    assert result_modify_page["type"] is FlowResultType.FORM
-    assert result_modify_page["step_id"] == "button"
-
-    # Configure existing button (1)
-    # For pre-existing buttons, the current configuration will be the "default" values in the form
-    result_button = await hass.config_entries.options.async_configure(
-        flow_id=result_page["flow_id"],
-        user_input=TEST_HALO_DATA_BUTTON,
-    )
-    assert result_button["type"] is FlowResultType.FORM
-    assert result_button["step_id"] == "button"
-
-    # Configure new button (2)
-    # Add ANY to "id" in entry to make it pass
-    halo_data = TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_TWO_BUTTONS
-    halo_data[CONF_ENTITY_MAP] = ANY
-    halo_data[CONF_HALO]["configuration"]["id"] = ANY
-    halo_data[CONF_HALO]["configuration"]["pages"][0]["id"] = ANY
-    halo_data[CONF_HALO]["configuration"]["pages"][0]["buttons"][0]["id"] = ANY
-    halo_data[CONF_HALO]["configuration"]["pages"][0]["buttons"][1]["id"] = ANY
-
-    result_button_2 = await hass.config_entries.options.async_configure(
-        flow_id=result_button["flow_id"],
-        user_input=TEST_HALO_DATA_BUTTON_2,
-    )
-    assert result_button_2["type"] is FlowResultType.CREATE_ENTRY
-    assert result_button_2["data"] == halo_data
-
-    # Check entity_map
-    assert (
-        TEST_HALO_BATTERY_SENSOR_ENTITY_ID
-        and TEST_HALO_BATTERY_CHARGING_BINARY_SENSOR_ENTITY_ID
-        in result_button_2["data"][CONF_ENTITY_MAP].values()
-    )
+    assert result_button["data"] == TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION
 
 
 async def test_halo_config_flow_options_modify_button(
-    hass: HomeAssistant, integration_halo: tuple[MockConfigEntry, AsyncMock]
+    hass: HomeAssistant,
+    integration_halo: tuple[MockConfigEntry, AsyncMock],
+    mock_halo_uuid: AsyncMock,
 ) -> None:
     """Test Halo options by modifying a button in an existing page."""
     config_entry, client = integration_halo
@@ -427,17 +345,6 @@ async def test_halo_config_flow_options_modify_button(
     assert result_modify_page["type"] is FlowResultType.FORM
     assert result_modify_page["step_id"] == "button"
 
-    # Modify content
-    halo_data = TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION
-    halo_data[CONF_HALO]["configuration"]["pages"][0]["buttons"][0]["content"] = {
-        "text": TEST_HALO_DATA_BUTTON_MODIFIED[CONF_TEXT]
-    }
-    # Add ANY to "id" in entry to make it pass
-    halo_data[CONF_ENTITY_MAP] = ANY
-    halo_data[CONF_HALO]["configuration"]["id"] = ANY
-    halo_data[CONF_HALO]["configuration"]["pages"][0]["id"] = ANY
-    halo_data[CONF_HALO]["configuration"]["pages"][0]["buttons"][0]["id"] = ANY
-
     # Configure button
     result_button = await hass.config_entries.options.async_configure(
         flow_id=result_page["flow_id"],
@@ -445,12 +352,8 @@ async def test_halo_config_flow_options_modify_button(
     )
 
     assert result_button["type"] is FlowResultType.CREATE_ENTRY
-    assert result_button["data"] == halo_data
-
-    # Check entity_map
     assert (
-        TEST_HALO_BATTERY_SENSOR_ENTITY_ID
-        in result_button["data"][CONF_ENTITY_MAP].values()
+        result_button["data"] == TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_MODIFIED
     )
 
 
@@ -546,4 +449,144 @@ async def test_halo_config_flow_options_remove_default(hass: HomeAssistant) -> N
     assert result_remove_default["type"] is FlowResultType.CREATE_ENTRY
     assert (
         result_remove_default["data"] == TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION
+    )
+
+
+# These tests modify the configuration of other tests. Must be fixed
+
+
+async def test_halo_config_flow_options_remove_button(hass: HomeAssistant) -> None:
+    """Test Halo options by removing a button from a page."""
+    # Setup Halo
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=TEST_HALO_SERIAL,
+        data=TEST_HALO_DATA_CREATE_ENTRY,
+        options=TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_TWO_BUTTONS,
+        title=TEST_HALO_NAME,
+    )
+    config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Start options
+    result_init = await hass.config_entries.options.async_init(config_entry.entry_id)
+    assert result_init["type"] is FlowResultType.MENU
+    assert result_init["step_id"] == "init"
+    # Ensure only the expected options are available
+    assert result_init["menu_options"] == [
+        HALO_OPTION_PAGE,
+        HALO_OPTION_MODIFY_PAGE,
+        HALO_OPTION_DELETE_PAGES,
+        HALO_OPTION_MODIFY_DEFAULT,
+    ]
+
+    # Select "Modify an existing page"
+    result_options = await hass.config_entries.options.async_configure(
+        flow_id=result_init["flow_id"],
+        user_input={"next_step_id": HALO_OPTION_MODIFY_PAGE},
+    )
+    assert result_options["type"] is FlowResultType.FORM
+    assert result_options["step_id"] == HALO_OPTION_MODIFY_PAGE
+
+    # Select page
+    result_page = await hass.config_entries.options.async_configure(
+        flow_id=result_options["flow_id"],
+        user_input=TEST_HALO_DATA_SELECT_PAGE,
+    )
+    assert result_page["type"] is FlowResultType.FORM
+    assert result_page["step_id"] == HALO_OPTION_PAGE
+
+    # Remove the second button
+    result_modify_page = await hass.config_entries.options.async_configure(
+        flow_id=result_page["flow_id"],
+        user_input=TEST_HALO_DATA_PAGE,
+    )
+    assert result_modify_page["type"] is FlowResultType.FORM
+    assert result_modify_page["step_id"] == "button"
+
+    # Configure the existing button
+    result_button = await hass.config_entries.options.async_configure(
+        flow_id=result_page["flow_id"],
+        user_input=TEST_HALO_DATA_BUTTON,
+    )
+    assert result_button["type"] is FlowResultType.CREATE_ENTRY
+    assert result_button["data"] == TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION
+
+
+async def test_halo_config_flow_options_add_button(
+    hass: HomeAssistant,
+    # integration_halo: tuple[MockConfigEntry, AsyncMock]
+) -> None:
+    """Test Halo options by adding a button to an existing page."""
+    # config_entry, client = integration_halo
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=TEST_HALO_SERIAL,
+        data=TEST_HALO_DATA_CREATE_ENTRY,
+        options=TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION,
+        title=TEST_HALO_NAME,
+    )
+    config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Start options
+    result_init = await hass.config_entries.options.async_init(config_entry.entry_id)
+    assert result_init["type"] is FlowResultType.MENU
+    assert result_init["step_id"] == "init"
+    # Ensure only the expected options are available
+    assert result_init["menu_options"] == [
+        HALO_OPTION_PAGE,
+        HALO_OPTION_MODIFY_PAGE,
+        HALO_OPTION_DELETE_PAGES,
+        HALO_OPTION_MODIFY_DEFAULT,
+    ]
+    # Select "Modify an existing page"
+    result_options = await hass.config_entries.options.async_configure(
+        flow_id=result_init["flow_id"],
+        user_input={"next_step_id": HALO_OPTION_MODIFY_PAGE},
+    )
+    assert result_options["type"] is FlowResultType.FORM
+    assert result_options["step_id"] == HALO_OPTION_MODIFY_PAGE
+    # Ensure only the expected options are available
+    assert result_options["data_schema"].schema["pages"].config["options"] == [
+        TEST_HALO_PAGE
+    ]
+
+    # Select page
+    result_page = await hass.config_entries.options.async_configure(
+        flow_id=result_options["flow_id"],
+        user_input=TEST_HALO_DATA_SELECT_PAGE,
+    )
+    assert result_page["type"] is FlowResultType.FORM
+    assert result_page["step_id"] == HALO_OPTION_PAGE
+
+    # Add an additional button
+    result_modify_page = await hass.config_entries.options.async_configure(
+        flow_id=result_page["flow_id"],
+        user_input=TEST_HALO_DATA_PAGE_TWO_BUTTONS,
+    )
+    assert result_modify_page["type"] is FlowResultType.FORM
+    assert result_modify_page["step_id"] == "button"
+
+    # Configure existing button (1)
+    # For pre-existing buttons, the current configuration will be the "default" values in the form
+    result_button = await hass.config_entries.options.async_configure(
+        flow_id=result_page["flow_id"],
+        user_input=TEST_HALO_DATA_BUTTON,
+    )
+    assert result_button["type"] is FlowResultType.FORM
+    assert result_button["step_id"] == "button"
+
+    # Configure new button (2)
+    with patch(TEST_HALO_UUID_TARGET, return_value=TEST_HALO_BUTTON_2_ID):
+        result_button_2 = await hass.config_entries.options.async_configure(
+            flow_id=result_button["flow_id"],
+            user_input=TEST_HALO_DATA_BUTTON_2,
+        )
+    assert result_button_2["type"] is FlowResultType.CREATE_ENTRY
+    assert (
+        result_button_2["data"]
+        == TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_TWO_BUTTONS
     )

@@ -321,7 +321,9 @@ class HaloOptionsFlowHandler(OptionsFlow):
 
     def __init__(self) -> None:
         """Initialize options."""
-        self._configuration: BaseConfiguration = BaseConfiguration(Configuration([]))
+        self._configuration: BaseConfiguration = BaseConfiguration(
+            Configuration(pages=[], id=self._halo_uuid())
+        )
         self._entity_ids: list[str] = []
         self._entity_map: dict[str, str] = {}
         self._page: Page

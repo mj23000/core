@@ -41,10 +41,15 @@ from .const import (
     TEST_FRIENDLY_NAME,
     TEST_FRIENDLY_NAME_3,
     TEST_FRIENDLY_NAME_4,
+    TEST_HALO_BUTTON_2_ID,
+    TEST_HALO_BUTTON_ID,
+    TEST_HALO_CONFIGURATION_ID,
     TEST_HALO_DATA_CREATE_ENTRY,
     TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION,
     TEST_HALO_NAME,
+    TEST_HALO_PAGE_ID,
     TEST_HALO_SERIAL,
+    TEST_HALO_UUID_TARGET,
     TEST_HOST_3,
     TEST_HOST_4,
     TEST_JID_1,
@@ -160,6 +165,21 @@ async def integration_halo_fixture(
     await hass.async_block_till_done()
 
     return (mock_config_entry_halo, mock_halo_client)
+
+
+@pytest.fixture
+def mock_halo_uuid() -> Generator[AsyncMock]:
+    """Mock _halo_uuid() to get predictable output."""
+    with patch(
+        TEST_HALO_UUID_TARGET,
+        side_effect=[
+            TEST_HALO_CONFIGURATION_ID,
+            TEST_HALO_PAGE_ID,
+            TEST_HALO_BUTTON_ID,
+            TEST_HALO_BUTTON_2_ID,
+        ],
+    ):
+        yield
 
 
 @pytest.fixture
@@ -517,7 +537,7 @@ def mock_halo_client() -> Generator[AsyncMock]:
         client.check_device_connection = AsyncMock()
         client.connect = AsyncMock()
         client.disconnect = AsyncMock()
-        client.websocket_connected = False
+        client.websocket_connected = True
 
         yield client
 

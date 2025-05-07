@@ -168,6 +168,14 @@ TEST_HALO_DATA_BUTTON_2 = {
     CONF_TITLE: "Bat. Charging",
     CONF_ICON: Icons.BATH_TUB.name,
 }
+
+TEST_HALO_UUID_TARGET = "homeassistant.components.bang_olufsen.config_flow.HaloOptionsFlowHandler._halo_uuid"
+
+TEST_HALO_CONFIGURATION_ID = "8f1b81fe-2748-11f0-b515-d0abd5978ec0"
+TEST_HALO_PAGE_ID = "c45c74b4-3c39-6c87-f858-22b24dc2ad8b"
+TEST_HALO_BUTTON_ID = "cf7a7540-fac2-aee2-ad95-1a7f90ac29f1"
+TEST_HALO_BUTTON_2_ID = "2ea37900-aaf6-4acd-5ce5-72ad24d7537b"
+
 TEST_HALO_DATA_CONFIGURATION = {
     "configuration": {
         "pages": [
@@ -181,14 +189,37 @@ TEST_HALO_DATA_CONFIGURATION = {
                         "value": 0,
                         "state": "inactive",
                         "default": False,
-                        "id": "cf7a7540-fac2-aee2-ad95-1a7f90ac29f1",
+                        "id": TEST_HALO_BUTTON_ID,
                     },
                 ],
-                "id": "c45c74b4-3c39-6c87-f858-22b24dc2ad8b",
+                "id": TEST_HALO_PAGE_ID,
             }
         ],
         "version": "2.0.0",
-        "id": "8f1b81fe-2748-11f0-b515-d0abd5978ec0",
+        "id": TEST_HALO_CONFIGURATION_ID,
+    }
+}
+TEST_HALO_DATA_CONFIGURATION_MODIFIED = {
+    "configuration": {
+        "pages": [
+            {
+                "title": TEST_HALO_PAGE_TITLE,
+                "buttons": [
+                    {
+                        "title": TEST_HALO_DATA_BUTTON_MODIFIED[CONF_TITLE],
+                        "content": {"text": "%"},
+                        "subtitle": "",
+                        "value": 0,
+                        "state": "inactive",
+                        "default": False,
+                        "id": TEST_HALO_BUTTON_ID,
+                    },
+                ],
+                "id": TEST_HALO_PAGE_ID,
+            }
+        ],
+        "version": "2.0.0",
+        "id": TEST_HALO_CONFIGURATION_ID,
     }
 }
 TEST_HALO_DATA_CONFIGURATION_DEFAULT = {
@@ -204,16 +235,17 @@ TEST_HALO_DATA_CONFIGURATION_DEFAULT = {
                         "value": 0,
                         "state": "inactive",
                         "default": True,
-                        "id": "cf7a7540-fac2-aee2-ad95-1a7f90ac29f1",
+                        "id": TEST_HALO_BUTTON_ID,
                     },
                 ],
-                "id": "c45c74b4-3c39-6c87-f858-22b24dc2ad8b",
+                "id": TEST_HALO_PAGE_ID,
             }
         ],
         "version": "2.0.0",
-        "id": "8f1b81fe-2748-11f0-b515-d0abd5978ec0",
+        "id": TEST_HALO_CONFIGURATION_ID,
     }
 }
+
 TEST_HALO_DATA_CONFIGURATION_TWO_BUTTONS = {
     "configuration": {
         "pages": [
@@ -227,7 +259,7 @@ TEST_HALO_DATA_CONFIGURATION_TWO_BUTTONS = {
                         "value": 0,
                         "state": "inactive",
                         "default": False,
-                        "id": "cf7a7540-fac2-aee2-ad95-1a7f90ac29f1",
+                        "id": TEST_HALO_BUTTON_ID,
                     },
                     {
                         "title": TEST_HALO_DATA_BUTTON_2[CONF_TITLE],
@@ -236,14 +268,14 @@ TEST_HALO_DATA_CONFIGURATION_TWO_BUTTONS = {
                         "value": 0,
                         "state": "inactive",
                         "default": False,
-                        "id": "cf7a7540-fac2-aee2-ad95-1a7f90ac29f2",
+                        "id": TEST_HALO_BUTTON_2_ID,
                     },
                 ],
-                "id": "c45c74b4-3c39-6c87-f858-22b24dc2ad8b",
+                "id": TEST_HALO_PAGE_ID,
             }
         ],
         "version": "2.0.0",
-        "id": "8f1b81fe-2748-11f0-b515-d0abd5978ec0",
+        "id": TEST_HALO_CONFIGURATION_ID,
     }
 }
 TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION = {
@@ -251,18 +283,21 @@ TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION = {
     CONF_MODEL: TEST_MODEL_HALO,
     CONF_NAME: TEST_HALO_NAME,
     CONF_HALO: TEST_HALO_DATA_CONFIGURATION,
-    CONF_ENTITY_MAP: {
-        "cf7a7540-fac2-aee2-ad95-1a7f90ac29f1": TEST_HALO_BATTERY_SENSOR_ENTITY_ID
-    },
+    CONF_ENTITY_MAP: {TEST_HALO_BUTTON_ID: TEST_HALO_BATTERY_SENSOR_ENTITY_ID},
+}
+TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_MODIFIED = {
+    CONF_HOST: TEST_HOST,
+    CONF_MODEL: TEST_MODEL_HALO,
+    CONF_NAME: TEST_HALO_NAME,
+    CONF_HALO: TEST_HALO_DATA_CONFIGURATION_MODIFIED,
+    CONF_ENTITY_MAP: {TEST_HALO_BUTTON_ID: TEST_HALO_BATTERY_SENSOR_ENTITY_ID},
 }
 TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_DEFAULT = {
     CONF_HOST: TEST_HOST,
     CONF_MODEL: TEST_MODEL_HALO,
     CONF_NAME: TEST_HALO_NAME,
     CONF_HALO: TEST_HALO_DATA_CONFIGURATION_DEFAULT,
-    CONF_ENTITY_MAP: {
-        "cf7a7540-fac2-aee2-ad95-1a7f90ac29f1": TEST_HALO_BATTERY_SENSOR_ENTITY_ID
-    },
+    CONF_ENTITY_MAP: {TEST_HALO_BUTTON_ID: TEST_HALO_BATTERY_SENSOR_ENTITY_ID},
 }
 TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_TWO_BUTTONS = {
     CONF_HOST: TEST_HOST,
@@ -270,11 +305,12 @@ TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_TWO_BUTTONS = {
     CONF_NAME: TEST_HALO_NAME,
     CONF_HALO: TEST_HALO_DATA_CONFIGURATION_TWO_BUTTONS,
     CONF_ENTITY_MAP: {
-        "cf7a7540-fac2-aee2-ad95-1a7f90ac29f1": TEST_HALO_BATTERY_SENSOR_ENTITY_ID,
-        "cf7a7540-fac2-aee2-ad95-1a7f90ac29f2": TEST_HALO_BATTERY_CHARGING_BINARY_SENSOR_ENTITY_ID,
+        TEST_HALO_BUTTON_ID: TEST_HALO_BATTERY_SENSOR_ENTITY_ID,
+        TEST_HALO_BUTTON_2_ID: TEST_HALO_BATTERY_CHARGING_BINARY_SENSOR_ENTITY_ID,
     },
 }
-TEST_HALO_PAGE = f"{TEST_HALO_PAGE_TITLE} - (c45c74b4-3c39-6c87-f858-22b24dc2ad8b)"
+
+TEST_HALO_PAGE = f"{TEST_HALO_PAGE_TITLE} - ({TEST_HALO_PAGE_ID})"
 TEST_HALO_DATA_SELECT_PAGE = {CONF_PAGES: TEST_HALO_PAGE}
 TEST_HALO_DATA_PAGE_TWO_BUTTONS = {
     CONF_PAGE_TITLE: TEST_HALO_PAGE_TITLE,
@@ -283,11 +319,8 @@ TEST_HALO_DATA_PAGE_TWO_BUTTONS = {
         TEST_HALO_BATTERY_CHARGING_BINARY_SENSOR_ENTITY_ID,
     ],
 }
-TEST_HALO_BUTTON = f"{TEST_HALO_PAGE_TITLE}-{TEST_HALO_DATA_BUTTON[CONF_TITLE]} (cf7a7540-fac2-aee2-ad95-1a7f90ac29f1)"
+TEST_HALO_BUTTON = f"{TEST_HALO_PAGE_TITLE}-{TEST_HALO_DATA_BUTTON[CONF_TITLE]} ({TEST_HALO_BUTTON_ID})"
 TEST_HALO_DATA_SELECT_DEFAULT = {CONF_DEFAULT_BUTTON: TEST_HALO_BUTTON}
-
-
-# TEST_HALO_DATA_SELECT_MODIFY_DEFAULT = {CONF_PAGES: TEST_HALO_PAGE}
 
 TEST_DATA_ZEROCONF = ZeroconfServiceInfo(
     ip_address=IPv4Address(TEST_HOST),
