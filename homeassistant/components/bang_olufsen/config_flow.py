@@ -282,7 +282,6 @@ class BangOlufsenConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                 jid=self._beolink_jid,
                 model=self._model,
                 name=self._name,
-                halo=None,
             ),
         )
 

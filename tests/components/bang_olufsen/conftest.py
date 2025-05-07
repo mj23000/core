@@ -1,6 +1,7 @@
 """Test fixtures for bang_olufsen."""
 
 from collections.abc import Generator
+from copy import deepcopy
 from unittest.mock import AsyncMock, Mock, patch
 
 from mozart_api import BeolinkJoinResult, Preset, Scene
@@ -97,7 +98,7 @@ def mock_config_entry_halo() -> MockConfigEntry:
         domain=DOMAIN,
         unique_id=TEST_HALO_SERIAL,
         data=TEST_HALO_DATA_CREATE_ENTRY,
-        options=TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION,
+        options=deepcopy(TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION),
         title=TEST_HALO_NAME,
     )
 
