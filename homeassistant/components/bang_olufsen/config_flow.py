@@ -675,7 +675,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
                     vol.Length(
                         min=HALO_MIN_NUM_BUTTONS,
                         max=HALO_MAX_NUM_BUTTONS,
-                        msg=f"{HALO_MIN_NUM_BUTTONS}-{HALO_MAX_NUM_BUTTONS} buttons have to be in a page",
+                        msg=f"Between {HALO_MIN_NUM_BUTTONS}-{HALO_MAX_NUM_BUTTONS} buttons have to be in a page",
                     ),
                     EntitySelector(
                         EntitySelectorConfig(
