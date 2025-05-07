@@ -85,6 +85,7 @@ from .const import (
     HALO_BUTTON_ICONS,
     HALO_MAX_NUM_BUTTONS,
     HALO_MAX_NUM_PAGES,
+    HALO_MIN_NUM_BUTTONS,
     HALO_OPTION_DELETE_PAGES,
     HALO_OPTION_MODIFY_DEFAULT,
     HALO_OPTION_MODIFY_PAGE,
@@ -671,7 +672,11 @@ class HaloOptionsFlowHandler(OptionsFlow):
             {
                 vol.Required(CONF_PAGE_TITLE, default=page_title): str,
                 vol.Required(CONF_ENTITIES, default=entities): vol.All(
-                    vol.Length(min=1, max=HALO_MAX_NUM_BUTTONS),
+                    vol.Length(
+                        min=HALO_MIN_NUM_BUTTONS,
+                        max=HALO_MAX_NUM_BUTTONS,
+                        msg=f"{HALO_MIN_NUM_BUTTONS}-{HALO_MAX_NUM_BUTTONS} buttons have to be in a page",
+                    ),
                     EntitySelector(
                         EntitySelectorConfig(
                             multiple=True,
