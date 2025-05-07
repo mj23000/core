@@ -85,6 +85,12 @@ from .const import (
     HALO_BUTTON_ICONS,
     HALO_MAX_NUM_BUTTONS,
     HALO_MAX_NUM_PAGES,
+    HALO_OPTION_DELETE_PAGES,
+    HALO_OPTION_MODIFY_DEFAULT,
+    HALO_OPTION_MODIFY_PAGE,
+    HALO_OPTION_PAGE,
+    HALO_OPTION_REMOVE_DEFAULT,
+    HALO_OPTION_SELECT_DEFAULT,
     HALO_TEXT_LENGTH,
     HALO_TITLE_LENGTH,
     MOZART_MODELS,
@@ -346,13 +352,19 @@ class HaloOptionsFlowHandler(OptionsFlow):
         self._default_button = get_default_button(self._configuration)
 
         options = []
-        # Remove "page" option if 3 already are in the configuration
+        # Add page option less than 3 pages are in the configuration
         if len(self._configuration.configuration.pages) < HALO_MAX_NUM_PAGES:
-            options.append("page")
+            options.append(HALO_OPTION_PAGE)
 
         # Add options that require at least one page in the configuration
         if len(self._configuration.configuration.pages) > 0:
-            options.extend(["modify_page", "delete_pages", "modify_default"])
+            options.extend(
+                [
+                    HALO_OPTION_MODIFY_PAGE,
+                    HALO_OPTION_DELETE_PAGES,
+                    HALO_OPTION_MODIFY_DEFAULT,
+                ]
+            )
 
         return self.async_show_menu(step_id="init", menu_options=options)
 
@@ -397,7 +409,9 @@ class HaloOptionsFlowHandler(OptionsFlow):
 
             return await self.async_step_button()
 
-        return self.async_show_form(step_id="page", data_schema=self._page_schema())
+        return self.async_show_form(
+            step_id=HALO_OPTION_PAGE, data_schema=self._page_schema()
+        )
 
     async def async_step_button(
         self, user_input: dict[str, Any] | None = None
@@ -496,7 +510,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
             ]
 
             return self.async_show_form(
-                step_id="page",
+                step_id=HALO_OPTION_PAGE,
                 data_schema=self._page_schema(
                     page_title=self._page.title,
                     entities=self._entity_ids_in_page,
@@ -504,7 +518,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
             )
 
         return self.async_show_form(
-            step_id="modify_page",
+            step_id=HALO_OPTION_MODIFY_PAGE,
             data_schema=self._page_selector_schema(multiple=False),
         )
 
@@ -537,7 +551,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
                 ),
             )
         return self.async_show_form(
-            step_id="delete_pages",
+            step_id=HALO_OPTION_DELETE_PAGES,
             data_schema=self._page_selector_schema(multiple=True),
         )
 
@@ -551,16 +565,16 @@ class HaloOptionsFlowHandler(OptionsFlow):
 
         # Add remove_default as an option if a default button has been set
         if self._default_button is not None:
-            options.append("remove_default")
+            options.append(HALO_OPTION_REMOVE_DEFAULT)
             description_placeholders["button"] = self._default_button.title
             # Check if there are any buttons available to select as default (at least 1 that is not default)
             if len(get_all_buttons(self._configuration)) > 1:
-                options.append("select_default")
+                options.append(HALO_OPTION_SELECT_DEFAULT)
         else:
-            options.append("select_default")
+            options.append(HALO_OPTION_SELECT_DEFAULT)
 
         return self.async_show_menu(
-            step_id="modify_default",
+            step_id=HALO_OPTION_MODIFY_DEFAULT,
             menu_options=options,
             description_placeholders=description_placeholders,
         )
@@ -603,7 +617,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
             )
 
         return self.async_show_form(
-            step_id="select_default",
+            step_id=HALO_OPTION_SELECT_DEFAULT,
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_DEFAULT_BUTTON): SelectSelector(
