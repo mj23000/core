@@ -56,7 +56,7 @@ class Halo:
 
         self._websocket_active = False
         self._websocket_task: asyncio.Task
-        self._queue: asyncio.Queue[str] | None = None
+        self._queue: asyncio.Queue[str] = asyncio.Queue()
         self._on_connection_lost: Callable[[None], Awaitable[None] | None] | None = None
         self._on_connection: Callable[[None], Awaitable[None] | None] | None = None
 
@@ -78,12 +78,6 @@ class Halo:
             If the data was successfully put into WebSocket queue.
 
         """
-        if self._queue is None:
-            self._logger.debug(
-                "Unable to send %s. WebSocket connection not active", data
-            )
-            return False
-
         try:
             self._queue.put_nowait(str(data.to_json()))
         except (asyncio.QueueFull, asyncio.QueueShutDown) as e:
@@ -204,10 +198,11 @@ class Halo:
 
     async def disconnect(self) -> None:
         """Stop WebSocket connection."""
+        # Empty queue
+        while self._queue.empty() is not True:
+            self._queue.get_nowait()
+
         self._websocket_active = False
-        if self._queue is not None:
-            self._queue.shutdown(True)
-            self._queue = None
         self._websocket_task.cancel()
 
     async def _websocket_connection(
@@ -231,9 +226,6 @@ class Halo:
                     ) as websocket,
                 ):
                     self.websocket_connected = True
-
-                    # Start queue
-                    self._queue = asyncio.Queue()
 
                     # Send configuration
                     if send_configuration:
@@ -263,11 +255,6 @@ class Halo:
                 ServerTimeoutError,
                 WSMessageTypeError,
             ) as error:
-                # Stop the queue while the WebSocket connection is inactive
-                if self._queue is not None:
-                    self._queue.shutdown(True)
-                    self._queue = None
-
                 if self.websocket_connected:
                     self._logger.debug("%s : %s - %s", host, type(error), error)
                     self.websocket_connected = False
