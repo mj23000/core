@@ -45,6 +45,14 @@ from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from homeassistant.util.ssl import get_default_context
 from homeassistant.util.uuid import random_uuid_hex
 
+from .beoremote_halo.const import (
+    MAX_BUTTONS,
+    MAX_PAGES,
+    MIN_BUTTONS_VALIDATION,
+    MIN_PAGES,
+    TEXT_MAX_LENGTH,
+    TITLE_MAX_LENGTH,
+)
 from .beoremote_halo.helpers import (
     clear_default_button,
     delete_page,
@@ -83,17 +91,12 @@ from .const import (
     DEFAULT_MODEL,
     DOMAIN,
     HALO_BUTTON_ICONS,
-    HALO_MAX_NUM_BUTTONS,
-    HALO_MAX_NUM_PAGES,
-    HALO_MIN_NUM_BUTTONS,
     HALO_OPTION_DELETE_PAGES,
     HALO_OPTION_MODIFY_DEFAULT,
     HALO_OPTION_MODIFY_PAGE,
     HALO_OPTION_PAGE,
     HALO_OPTION_REMOVE_DEFAULT,
     HALO_OPTION_SELECT_DEFAULT,
-    HALO_TEXT_LENGTH,
-    HALO_TITLE_LENGTH,
     MOZART_MODELS,
     ZEROCONF_HALO,
     ZEROCONF_MOZART,
@@ -355,11 +358,11 @@ class HaloOptionsFlowHandler(OptionsFlow):
 
         options = []
         # Add page option less than 3 pages are in the configuration
-        if len(self._configuration.configuration.pages) < HALO_MAX_NUM_PAGES:
+        if len(self._configuration.configuration.pages) < MAX_PAGES:
             options.append(HALO_OPTION_PAGE)
 
         # Add options that require at least one page in the configuration
-        if len(self._configuration.configuration.pages) > 0:
+        if len(self._configuration.configuration.pages) > MIN_PAGES:
             options.extend(
                 [
                     HALO_OPTION_MODIFY_PAGE,
@@ -402,7 +405,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
                             new_buttons.remove(button)
 
                 # Add the (modified?) page title and buttons to the current configuration
-                self._configuration = update_page(
+                update_page(
                     self._configuration,
                     self._page.id,
                     user_input[CONF_PAGE_TITLE],
@@ -440,7 +443,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
                 self._page.buttons.append(button)
             else:
                 # Update existing button
-                self._configuration = update_button(
+                update_button(
                     self._configuration,
                     self._button.id,
                     title=user_input[CONF_TITLE],
@@ -470,22 +473,19 @@ class HaloOptionsFlowHandler(OptionsFlow):
                     ),
                 )
 
-        if not self._page_being_modified:
-            button_schema = self._button_schema()
-        # Add current values as "default" values if page is being modified
-        else:
-            # Get current button attributes from entity_map and page
+        # Schema without default values for new buttons
+        button_schema = self._button_schema()
+
+        # If a page is being modified, then default values for existing buttons should used
+        if self._page_being_modified:
             self._button = None
             for button in self._page.buttons:
                 if self._entity_map[button.id] == self._entity_ids[-1]:
                     self._button = button
-            # Newly added buttons won't be available in the entity_map and won't have any initial values
-            if self._button is None:
-                button_schema = self._button_schema()
-            else:
-                button_schema = self._button_schema(
-                    self._button.title, self._button.subtitle, self._button.content
-                )
+
+                    button_schema = self._button_schema(
+                        self._button.title, self._button.subtitle, self._button.content
+                    )
 
         return self.async_show_form(
             step_id="button",
@@ -540,7 +540,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
                     self._entity_map.pop(button.id)
 
                 # Delete page from configuration
-                self._configuration = delete_page(self._configuration, page_id)
+                delete_page(self._configuration, page_id)
 
             return self.async_create_entry(
                 title="Updated configuration",
@@ -589,7 +589,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
         """Select a default button."""
         if user_input is not None:
             # Remove any previous default button
-            self._configuration = clear_default_button(self._configuration)
+            clear_default_button(self._configuration)
 
             # Update configuration with new default
             set_default_button(
@@ -640,7 +640,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
         """Remove the default attribute from a button."""
 
         # Remove current default from configuration
-        self._configuration = clear_default_button(self._configuration)
+        clear_default_button(self._configuration)
 
         return self.async_create_entry(
             title="Updated configuration",
@@ -676,9 +676,9 @@ class HaloOptionsFlowHandler(OptionsFlow):
                 vol.Required(CONF_PAGE_TITLE, default=page_title): str,
                 vol.Required(CONF_ENTITIES, default=entities): vol.All(
                     vol.Length(
-                        min=HALO_MIN_NUM_BUTTONS,
-                        max=HALO_MAX_NUM_BUTTONS,
-                        msg=f"Between {HALO_MIN_NUM_BUTTONS}-{HALO_MAX_NUM_BUTTONS} buttons have to be in a page",
+                        min=MIN_BUTTONS_VALIDATION,
+                        max=MAX_BUTTONS,
+                        msg=f"Between {MIN_BUTTONS_VALIDATION}-{MAX_BUTTONS} buttons have to be in a page",
                     ),
                     EntitySelector(
                         EntitySelectorConfig(
@@ -705,7 +705,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
     def _button_schema(
         self,
         title: str | vol.Undefined = vol.UNDEFINED,
-        subtitle: str = "",
+        subtitle: str | None = "",
         content: Icon | Text | None = None,
     ) -> vol.Schema:
         """Fill schema for button modification or creation."""
@@ -736,18 +736,18 @@ class HaloOptionsFlowHandler(OptionsFlow):
             {
                 vol.Required(CONF_TITLE, default=title): vol.All(
                     str,
-                    vol.Length(max=HALO_TITLE_LENGTH),
+                    vol.Length(max=TITLE_MAX_LENGTH),
                 ),
                 vol.Optional(CONF_SUBTITLE, default=subtitle): vol.All(
                     str,
-                    vol.Length(max=HALO_TITLE_LENGTH),
+                    vol.Length(max=TITLE_MAX_LENGTH),
                 ),
                 vol.Exclusive(**icon_kwargs): SelectSelector(
                     SelectSelectorConfig(options=HALO_BUTTON_ICONS)
                 ),
                 vol.Exclusive(**text_kwargs): vol.All(
                     str,
-                    vol.Length(max=HALO_TEXT_LENGTH),
+                    vol.Length(max=TEXT_MAX_LENGTH),
                 ),
             },
         )

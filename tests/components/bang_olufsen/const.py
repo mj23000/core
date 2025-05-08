@@ -183,8 +183,6 @@ TEST_HALO_DATA_CONFIGURATION = {
                         "title": TEST_HALO_DATA_BUTTON[CONF_TITLE],
                         "content": {"icon": Icons.ENERGIZE.value},
                         "subtitle": "",
-                        "value": 0,
-                        "state": "inactive",
                         "default": False,
                         "id": TEST_HALO_BUTTON_ID,
                     },
@@ -192,14 +190,14 @@ TEST_HALO_DATA_CONFIGURATION = {
                 "id": TEST_HALO_PAGE_ID,
             }
         ],
-        "version": "2.0.0",
+        "version": "1.0.2",
         "id": TEST_HALO_CONFIGURATION_ID,
     }
 }
 TEST_HALO_DATA_CONFIGURATION_EMPTY = {
     "configuration": {
         "pages": [],
-        "version": "2.0.0",
+        "version": "1.0.2",
         "id": TEST_HALO_CONFIGURATION_ID,
     }
 }
@@ -214,8 +212,6 @@ TEST_HALO_DATA_CONFIGURATION_DEFAULT = {
                         "title": TEST_HALO_DATA_BUTTON[CONF_TITLE],
                         "content": {"icon": Icons.ENERGIZE.value},
                         "subtitle": "",
-                        "value": 0,
-                        "state": "inactive",
                         "default": True,
                         "id": TEST_HALO_BUTTON_ID,
                     },
@@ -223,7 +219,7 @@ TEST_HALO_DATA_CONFIGURATION_DEFAULT = {
                 "id": TEST_HALO_PAGE_ID,
             }
         ],
-        "version": "2.0.0",
+        "version": "1.0.2",
         "id": TEST_HALO_CONFIGURATION_ID,
     }
 }
@@ -238,8 +234,6 @@ TEST_HALO_DATA_CONFIGURATION_2_BUTTONS = {
                         "title": TEST_HALO_DATA_BUTTON[CONF_TITLE],
                         "content": {"icon": Icons.ENERGIZE.value},
                         "subtitle": "",
-                        "value": 0,
-                        "state": "inactive",
                         "default": False,
                         "id": TEST_HALO_BUTTON_ID,
                     },
@@ -247,8 +241,6 @@ TEST_HALO_DATA_CONFIGURATION_2_BUTTONS = {
                         "title": TEST_HALO_DATA_BUTTON_2[CONF_TITLE],
                         "content": {"text": TEST_HALO_DATA_BUTTON_2[CONF_TEXT]},
                         "subtitle": "",
-                        "value": 0,
-                        "state": "inactive",
                         "default": False,
                         "id": TEST_HALO_BUTTON_2_ID,
                     },
@@ -256,7 +248,7 @@ TEST_HALO_DATA_CONFIGURATION_2_BUTTONS = {
                 "id": TEST_HALO_PAGE_ID,
             }
         ],
-        "version": "2.0.0",
+        "version": "1.0.2",
         "id": TEST_HALO_CONFIGURATION_ID,
     }
 }
@@ -271,8 +263,6 @@ TEST_HALO_DATA_CONFIGURATION_2_BUTTONS_MODIFIED = {
                         "title": TEST_HALO_DATA_BUTTON_MODIFIED[CONF_TITLE],
                         "content": {"text": "%"},
                         "subtitle": "",
-                        "value": 0,
-                        "state": "inactive",
                         "default": False,
                         "id": TEST_HALO_BUTTON_ID,
                     },
@@ -280,8 +270,6 @@ TEST_HALO_DATA_CONFIGURATION_2_BUTTONS_MODIFIED = {
                         "title": TEST_HALO_DATA_BUTTON_2[CONF_TITLE],
                         "content": {"text": TEST_HALO_DATA_BUTTON_2[CONF_TEXT]},
                         "subtitle": "",
-                        "value": 0,
-                        "state": "inactive",
                         "default": False,
                         "id": TEST_HALO_BUTTON_2_ID,
                     },
@@ -289,7 +277,7 @@ TEST_HALO_DATA_CONFIGURATION_2_BUTTONS_MODIFIED = {
                 "id": TEST_HALO_PAGE_ID,
             }
         ],
-        "version": "2.0.0",
+        "version": "1.0.2",
         "id": TEST_HALO_CONFIGURATION_ID,
     }
 }

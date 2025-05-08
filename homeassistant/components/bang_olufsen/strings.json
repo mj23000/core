@@ -228,7 +228,7 @@
           "description": "The title of the notification"
         },
         "subtitle": {
-          "name": "Subitle",
+          "name": "Subtitle",
           "description": "The subtitle of the notification. 6 lines are supported before formatting starts to break. Use | in yaml mode to construct multiline strings"
         }
       }

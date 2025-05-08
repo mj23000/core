@@ -128,12 +128,15 @@ class Halo:
 
         """
         if update_configuration and isinstance(update.update, UpdateButton):
-            # Update configuration
-            self._configuration = update_button(
+            # Update button in configuration
+            update_button(
                 self._configuration,
                 update.update.id,
                 state=update.update.state,
                 value=update.update.value,
+                title=update.update.title,
+                subtitle=update.update.subtitle,
+                content=update.update.content,
             )
 
         return self._send_data(update)

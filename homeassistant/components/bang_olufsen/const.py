@@ -152,13 +152,6 @@ HALO_OPTION_DELETE_PAGES = "delete_pages"
 HALO_OPTION_MODIFY_DEFAULT = "modify_default"
 HALO_OPTION_SELECT_DEFAULT = "select_default"
 HALO_OPTION_REMOVE_DEFAULT = "remove_default"
-# Configuration limitations
-HALO_TITLE_LENGTH: Final = 15
-HALO_PAGE_LENGTH: Final = 35
-HALO_TEXT_LENGTH: Final = 6
-HALO_MIN_NUM_BUTTONS: Final = 1
-HALO_MAX_NUM_BUTTONS: Final = 8
-HALO_MAX_NUM_PAGES: Final = 3
 
 # The names of compatible button icons for the Beoremote Halo
 HALO_BUTTON_ICONS: list[str] = [icon.name for icon in Icons]
