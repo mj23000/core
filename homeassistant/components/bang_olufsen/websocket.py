@@ -571,13 +571,18 @@ class HaloWebsocket(HaloBase):
     def _handle_light_update(self, state: State) -> tuple[ButtonState, int]:
         """Handle state change events of Light entities."""
         try:
-            brightness = (
-                state.attributes[ATTR_BRIGHTNESS]
-                if state.attributes[ATTR_BRIGHTNESS] is not None
-                else 0
-            )
-            # Brightness does not go to 255?
-            converted_state = interpolate_button_value(brightness, 0, 254)
+            # Determine value based on available attributes
+            if ATTR_BRIGHTNESS in state.attributes:
+                brightness = (
+                    state.attributes[ATTR_BRIGHTNESS]
+                    if state.attributes[ATTR_BRIGHTNESS] is not None
+                    else 0
+                )
+                converted_state = interpolate_button_value(brightness, 1, 255)
+
+            else:
+                converted_state = MAX_VALUE if state.state == STATE_ON else MIN_VALUE
+
         except ValueError:
             _LOGGER.debug("Error when handling light state %s", state)
 
@@ -587,7 +592,7 @@ class HaloWebsocket(HaloBase):
         else:
             # Process the on/off state for a light
             button_state = (
-                ButtonState.ACTIVE if state.state == "on" else ButtonState.INACTIVE
+                ButtonState.ACTIVE if state.state == STATE_ON else ButtonState.INACTIVE
             )
             # Process the value state for a light
             button_value = converted_state
