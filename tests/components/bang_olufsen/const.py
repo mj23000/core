@@ -163,7 +163,7 @@ TEST_HALO_DATA_BUTTON_MODIFIED = {
 TEST_HALO_DATA_BUTTON_2 = {
     # String limit of 15
     CONF_TITLE: "Bat. Charging",
-    CONF_ICON: Icons.BATH_TUB.name,
+    CONF_TEXT: "State",
 }
 
 TEST_HALO_UUID_TARGET = "homeassistant.components.bang_olufsen.config_flow.HaloOptionsFlowHandler._halo_uuid"
@@ -203,29 +203,7 @@ TEST_HALO_DATA_CONFIGURATION_EMPTY = {
         "id": TEST_HALO_CONFIGURATION_ID,
     }
 }
-TEST_HALO_DATA_CONFIGURATION_MODIFIED = {
-    "configuration": {
-        "pages": [
-            {
-                "title": TEST_HALO_PAGE_TITLE,
-                "buttons": [
-                    {
-                        "title": TEST_HALO_DATA_BUTTON_MODIFIED[CONF_TITLE],
-                        "content": {"text": "%"},
-                        "subtitle": "",
-                        "value": 0,
-                        "state": "inactive",
-                        "default": False,
-                        "id": TEST_HALO_BUTTON_ID,
-                    },
-                ],
-                "id": TEST_HALO_PAGE_ID,
-            }
-        ],
-        "version": "2.0.0",
-        "id": TEST_HALO_CONFIGURATION_ID,
-    }
-}
+
 TEST_HALO_DATA_CONFIGURATION_DEFAULT = {
     "configuration": {
         "pages": [
@@ -250,7 +228,7 @@ TEST_HALO_DATA_CONFIGURATION_DEFAULT = {
     }
 }
 
-TEST_HALO_DATA_CONFIGURATION_TWO_BUTTONS = {
+TEST_HALO_DATA_CONFIGURATION_2_BUTTONS = {
     "configuration": {
         "pages": [
             {
@@ -267,7 +245,7 @@ TEST_HALO_DATA_CONFIGURATION_TWO_BUTTONS = {
                     },
                     {
                         "title": TEST_HALO_DATA_BUTTON_2[CONF_TITLE],
-                        "content": {"icon": Icons.BATH_TUB.value},
+                        "content": {"text": TEST_HALO_DATA_BUTTON_2[CONF_TEXT]},
                         "subtitle": "",
                         "value": 0,
                         "state": "inactive",
@@ -282,6 +260,40 @@ TEST_HALO_DATA_CONFIGURATION_TWO_BUTTONS = {
         "id": TEST_HALO_CONFIGURATION_ID,
     }
 }
+
+TEST_HALO_DATA_CONFIGURATION_2_BUTTONS_MODIFIED = {
+    "configuration": {
+        "pages": [
+            {
+                "title": TEST_HALO_PAGE_TITLE,
+                "buttons": [
+                    {
+                        "title": TEST_HALO_DATA_BUTTON_MODIFIED[CONF_TITLE],
+                        "content": {"text": "%"},
+                        "subtitle": "",
+                        "value": 0,
+                        "state": "inactive",
+                        "default": False,
+                        "id": TEST_HALO_BUTTON_ID,
+                    },
+                    {
+                        "title": TEST_HALO_DATA_BUTTON_2[CONF_TITLE],
+                        "content": {"text": TEST_HALO_DATA_BUTTON_2[CONF_TEXT]},
+                        "subtitle": "",
+                        "value": 0,
+                        "state": "inactive",
+                        "default": False,
+                        "id": TEST_HALO_BUTTON_2_ID,
+                    },
+                ],
+                "id": TEST_HALO_PAGE_ID,
+            }
+        ],
+        "version": "2.0.0",
+        "id": TEST_HALO_CONFIGURATION_ID,
+    }
+}
+
 TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION = {
     CONF_HOST: TEST_HOST,
     CONF_MODEL: TEST_MODEL_HALO,
@@ -296,13 +308,6 @@ TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_EMPTY = {
     CONF_HALO: TEST_HALO_DATA_CONFIGURATION_EMPTY,
     CONF_ENTITY_MAP: {},
 }
-TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_MODIFIED = {
-    CONF_HOST: TEST_HOST,
-    CONF_MODEL: TEST_MODEL_HALO,
-    CONF_NAME: TEST_HALO_NAME,
-    CONF_HALO: TEST_HALO_DATA_CONFIGURATION_MODIFIED,
-    CONF_ENTITY_MAP: {TEST_HALO_BUTTON_ID: TEST_HALO_BATTERY_SENSOR_ENTITY_ID},
-}
 TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_DEFAULT = {
     CONF_HOST: TEST_HOST,
     CONF_MODEL: TEST_MODEL_HALO,
@@ -310,11 +315,21 @@ TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_DEFAULT = {
     CONF_HALO: TEST_HALO_DATA_CONFIGURATION_DEFAULT,
     CONF_ENTITY_MAP: {TEST_HALO_BUTTON_ID: TEST_HALO_BATTERY_SENSOR_ENTITY_ID},
 }
-TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_TWO_BUTTONS = {
+TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_2_BUTTONS = {
     CONF_HOST: TEST_HOST,
     CONF_MODEL: TEST_MODEL_HALO,
     CONF_NAME: TEST_HALO_NAME,
-    CONF_HALO: TEST_HALO_DATA_CONFIGURATION_TWO_BUTTONS,
+    CONF_HALO: TEST_HALO_DATA_CONFIGURATION_2_BUTTONS,
+    CONF_ENTITY_MAP: {
+        TEST_HALO_BUTTON_ID: TEST_HALO_BATTERY_SENSOR_ENTITY_ID,
+        TEST_HALO_BUTTON_2_ID: TEST_HALO_BATTERY_CHARGING_BINARY_SENSOR_ENTITY_ID,
+    },
+}
+TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_2_BUTTONS_MODIFIED = {
+    CONF_HOST: TEST_HOST,
+    CONF_MODEL: TEST_MODEL_HALO,
+    CONF_NAME: TEST_HALO_NAME,
+    CONF_HALO: TEST_HALO_DATA_CONFIGURATION_2_BUTTONS_MODIFIED,
     CONF_ENTITY_MAP: {
         TEST_HALO_BUTTON_ID: TEST_HALO_BATTERY_SENSOR_ENTITY_ID,
         TEST_HALO_BUTTON_2_ID: TEST_HALO_BATTERY_CHARGING_BINARY_SENSOR_ENTITY_ID,
@@ -324,7 +339,7 @@ TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_TWO_BUTTONS = {
 TEST_HALO_PAGE = f"{TEST_HALO_PAGE_TITLE} - ({TEST_HALO_PAGE_ID})"
 TEST_HALO_DATA_SELECT_PAGE = {CONF_PAGES: TEST_HALO_PAGE}
 TEST_HALO_DATA_SELECT_PAGES = {CONF_PAGES: [TEST_HALO_PAGE]}
-TEST_HALO_DATA_PAGE_TWO_BUTTONS = {
+TEST_HALO_DATA_PAGE_2_BUTTONS = {
     CONF_PAGE_TITLE: TEST_HALO_PAGE_TITLE,
     CONF_ENTITIES: [
         TEST_HALO_BATTERY_SENSOR_ENTITY_ID,
