@@ -46,12 +46,13 @@ from homeassistant.util.ssl import get_default_context
 from homeassistant.util.uuid import random_uuid_hex
 
 from .beoremote_halo.const import (
+    BUTTON_TEXT_MAX_LENGTH,
+    BUTTON_TITLE_MAX_LENGTH,
     MAX_BUTTONS,
     MAX_PAGES,
     MIN_BUTTONS_VALIDATION,
     MIN_PAGES,
-    TEXT_MAX_LENGTH,
-    TITLE_MAX_LENGTH,
+    PAGE_TITLE_MAX_LENGTH,
 )
 from .beoremote_halo.helpers import (
     clear_default_button,
@@ -673,7 +674,10 @@ class HaloOptionsFlowHandler(OptionsFlow):
 
         return vol.Schema(
             {
-                vol.Required(CONF_PAGE_TITLE, default=page_title): str,
+                vol.Required(CONF_PAGE_TITLE, default=page_title): vol.All(
+                    str,
+                    vol.Length(max=PAGE_TITLE_MAX_LENGTH),
+                ),
                 vol.Required(CONF_ENTITIES, default=entities): vol.All(
                     vol.Length(
                         min=MIN_BUTTONS_VALIDATION,
@@ -736,18 +740,18 @@ class HaloOptionsFlowHandler(OptionsFlow):
             {
                 vol.Required(CONF_TITLE, default=title): vol.All(
                     str,
-                    vol.Length(max=TITLE_MAX_LENGTH),
+                    vol.Length(max=BUTTON_TITLE_MAX_LENGTH),
                 ),
                 vol.Optional(CONF_SUBTITLE, default=subtitle): vol.All(
                     str,
-                    vol.Length(max=TITLE_MAX_LENGTH),
+                    vol.Length(max=BUTTON_TITLE_MAX_LENGTH),
                 ),
                 vol.Exclusive(**icon_kwargs): SelectSelector(
                     SelectSelectorConfig(options=HALO_BUTTON_ICONS)
                 ),
                 vol.Exclusive(**text_kwargs): vol.All(
                     str,
-                    vol.Length(max=TEXT_MAX_LENGTH),
+                    vol.Length(max=BUTTON_TEXT_MAX_LENGTH),
                 ),
             },
         )
