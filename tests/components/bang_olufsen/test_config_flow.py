@@ -340,7 +340,7 @@ async def test_halo_config_flow_options_delete_page(
 
 
 async def test_halo_config_flow_options_modify_buttons(hass: HomeAssistant) -> None:
-    """Test Halo options by modifying the title, subtitle, Icon->Text and Text->Value for content for 2 buttons in an existing page."""
+    """Test Halo options by modifying the title, subtitle, Icon->Text and Text->state for content for 2 buttons in an existing page."""
     # Setup Halo with 2 buttons to test default values for both Icon and Text content
     config_entry = MockConfigEntry(
         domain=DOMAIN,
@@ -410,8 +410,8 @@ async def test_halo_config_flow_options_modify_buttons(hass: HomeAssistant) -> N
 
 
 async def test_halo_config_flow_options_modify_button(hass: HomeAssistant) -> None:
-    """Test Halo options by modifying the content Value->Text for a button in an existing page."""
-    # Setup Halo with 2 buttons to test default values for Value
+    """Test Halo options by modifying the content state->Text for a button in an existing page."""
+    # Setup Halo with 2 buttons to test default values for state
     config_entry = MockConfigEntry(
         domain=DOMAIN,
         unique_id=TEST_HALO_SERIAL,

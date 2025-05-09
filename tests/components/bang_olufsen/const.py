@@ -39,7 +39,6 @@ from homeassistant.components.bang_olufsen.const import (
     CONF_SUBTITLE,
     CONF_TEXT,
     CONF_TITLE,
-    CONF_VALUE,
     BangOlufsenSource,
 )
 from homeassistant.const import (
@@ -49,6 +48,7 @@ from homeassistant.const import (
     CONF_ICON,
     CONF_MODEL,
     CONF_NAME,
+    CONF_STATE,
 )
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
@@ -172,7 +172,7 @@ TEST_HALO_DATA_BUTTON_2 = {
 }
 TEST_HALO_DATA_BUTTON_2_MODIFIED = {
     CONF_TITLE: "Bat. Charging",
-    CONF_VALUE: True,
+    CONF_STATE: True,
 }
 
 TEST_HALO_UUID_TARGET = "homeassistant.components.bang_olufsen.config_flow.HaloOptionsFlowHandler._halo_uuid"
@@ -300,7 +300,7 @@ TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION = {
     CONF_ENTITY_MAP: {
         TEST_HALO_BUTTON_ID: {
             CONF_ENTITY_ID: TEST_HALO_BATTERY_SENSOR_ENTITY_ID,
-            CONF_VALUE: False,
+            CONF_STATE: False,
         },
     },
 }
@@ -319,7 +319,7 @@ TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_DEFAULT = {
     CONF_ENTITY_MAP: {
         TEST_HALO_BUTTON_ID: {
             CONF_ENTITY_ID: TEST_HALO_BATTERY_SENSOR_ENTITY_ID,
-            CONF_VALUE: False,
+            CONF_STATE: False,
         },
     },
 }
@@ -331,11 +331,11 @@ TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_2_BUTTONS = {
     CONF_ENTITY_MAP: {
         TEST_HALO_BUTTON_ID: {
             CONF_ENTITY_ID: TEST_HALO_BATTERY_SENSOR_ENTITY_ID,
-            CONF_VALUE: False,
+            CONF_STATE: False,
         },
         TEST_HALO_BUTTON_2_ID: {
             CONF_ENTITY_ID: TEST_HALO_BATTERY_CHARGING_BINARY_SENSOR_ENTITY_ID,
-            CONF_VALUE: False,
+            CONF_STATE: False,
         },
     },
 }
@@ -347,11 +347,11 @@ TEST_HALO_DATA_CREATE_ENTRY_WITH_CONFIGURATION_2_BUTTONS_MODIFIED = {
     CONF_ENTITY_MAP: {
         TEST_HALO_BUTTON_ID: {
             CONF_ENTITY_ID: TEST_HALO_BATTERY_SENSOR_ENTITY_ID,
-            CONF_VALUE: False,
+            CONF_STATE: False,
         },
         TEST_HALO_BUTTON_2_ID: {
             CONF_ENTITY_ID: TEST_HALO_BATTERY_CHARGING_BINARY_SENSOR_ENTITY_ID,
-            CONF_VALUE: True,
+            CONF_STATE: True,
         },
     },
 }

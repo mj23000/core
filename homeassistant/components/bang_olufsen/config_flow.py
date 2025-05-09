@@ -34,6 +34,7 @@ from homeassistant.const import (
     CONF_ICON,
     CONF_MODEL,
     CONF_NAME,
+    CONF_STATE,
 )
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
@@ -92,7 +93,6 @@ from .const import (
     CONF_SUBTITLE,
     CONF_TEXT,
     CONF_TITLE,
-    CONF_VALUE,
     DEFAULT_MODEL,
     DOMAIN,
     HALO_BUTTON_ICONS,
@@ -441,7 +441,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
                 # Update entity_map
                 self._entity_map[button.id] = {
                     CONF_ENTITY_ID: self._entity_ids[-1],
-                    CONF_VALUE: user_input.get(CONF_VALUE, False),
+                    CONF_STATE: user_input.get(CONF_STATE, False),
                 }
 
                 # Add to current page
@@ -455,9 +455,9 @@ class HaloOptionsFlowHandler(OptionsFlow):
                     subtitle=user_input[CONF_SUBTITLE],
                     content=self._determine_content(user_input),
                 )
-                # Check if the Value should be updated in the entity_map
-                self._entity_map[self._button.id][CONF_VALUE] = user_input.get(
-                    CONF_VALUE, False
+                # Check if the state should be updated in the entity_map
+                self._entity_map[self._button.id][CONF_STATE] = user_input.get(
+                    CONF_STATE, False
                 )
 
             self._entity_ids.pop()
@@ -492,7 +492,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
                         self._button.title,
                         self._button.subtitle,
                         self._button.content,
-                        self._entity_map[button.id][CONF_VALUE],
+                        self._entity_map[button.id][CONF_STATE],
                     )
 
         return self.async_show_form(
@@ -664,17 +664,17 @@ class HaloOptionsFlowHandler(OptionsFlow):
 
     def _determine_content(self, user_input: dict[str, Any]) -> Icon | Text:
         """Determine content based on user_input."""
-        content_value: Icon | Text
+        content: Icon | Text
 
         if CONF_ICON in user_input:
-            content_value = Icon(Icons[user_input[CONF_ICON]])
+            content = Icon(Icons[user_input[CONF_ICON]])
         elif CONF_TEXT in user_input:
-            content_value = Text(user_input[CONF_TEXT])
+            content = Text(user_input[CONF_TEXT])
         else:
-            # Entity value would replace this
-            content_value = Text("")
+            # Entity state would replace this
+            content = Text("")
 
-        return content_value
+        return content
 
     def _halo_uuid(self) -> str:
         """Get a properly formatted Halo UUID."""
@@ -733,7 +733,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
         title: str | vol.Undefined = vol.UNDEFINED,
         subtitle: str | None = "",
         content: Icon | Text | None = None,
-        value: bool = False,
+        state: bool = False,
     ) -> vol.Schema:
         """Fill schema for button modification or creation."""
 
@@ -745,19 +745,19 @@ class HaloOptionsFlowHandler(OptionsFlow):
 
         exclusive_kwargs: ExclusiveKwargs = {
             "group_of_exclusion": "content",
-            "msg": "Choose either an Icon, Text or Value",
+            "msg": "Choose either an Icon, Text or entity state",
         }
         icon_kwargs: ExclusiveKwargs = {"schema": CONF_ICON, **exclusive_kwargs}
         text_kwargs: ExclusiveKwargs = {"schema": CONF_TEXT, **exclusive_kwargs}
-        value_kwargs: ExclusiveKwargs = {"schema": CONF_VALUE, **exclusive_kwargs}
+        state_kwargs: ExclusiveKwargs = {"schema": CONF_STATE, **exclusive_kwargs}
 
-        # Add suggested value to kwargs if an Icon or Text value is available
+        # Add suggested value to kwargs if an Icon, Text or state is available
         if isinstance(content, Icon):
             icon_kwargs["description"] = {"suggested_value": content.icon.name}
         elif isinstance(content, Text):
             text_kwargs["description"] = {"suggested_value": content.text}
-        if value is True:
-            value_kwargs["description"] = {"suggested_value": value}
+        if state is True:
+            state_kwargs["description"] = {"suggested_value": state}
 
         return vol.Schema(
             {
@@ -776,7 +776,7 @@ class HaloOptionsFlowHandler(OptionsFlow):
                     str,
                     vol.Length(max=BUTTON_TEXT_MAX_LENGTH),
                 ),
-                vol.Exclusive(**value_kwargs): BooleanSelector(BooleanSelectorConfig()),
+                vol.Exclusive(**state_kwargs): BooleanSelector(BooleanSelectorConfig()),
             },
         )
 

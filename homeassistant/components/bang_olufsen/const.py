@@ -167,7 +167,7 @@ class EntityMapValues(TypedDict):
 
     entity_id: str
     # Use entity value instead of Icon / Text
-    value: bool
+    state: bool
 
 
 # Mozart models
