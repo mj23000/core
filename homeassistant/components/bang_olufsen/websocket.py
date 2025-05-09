@@ -87,7 +87,11 @@ from .beoremote_halo.models import (
     UpdateButton,
     WheelEvent,
 )
-from .beoremote_halo.util import clamp_button_value, interpolate_button_value
+from .beoremote_halo.util import (
+    clamp_button_value,
+    interpolate_button_value,
+    trim_button_text,
+)
 from .const import (
     CONF_CONTENT,
     CONF_ENTITY_MAP,
@@ -300,7 +304,9 @@ class HaloWebsocket(HaloBase):
 
         # Add entity value as title update if defined
         if self._entity_map[button_id][CONF_VALUE] is True:
-            update_kwargs[CONF_CONTENT] = Text(str(int(button_value)))
+            update_kwargs[CONF_CONTENT] = Text(
+                trim_button_text(str(entity_state.state))
+            )
 
         # Send update to Halo
         await self._client.update(Update(update=UpdateButton(**update_kwargs)))
