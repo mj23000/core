@@ -70,11 +70,11 @@
         "title": "Configure button",
         "description": "Select a configuration for the {entity} button in the {page} page.\n\nChoose either Icon, Text or Value for the content in the middle of the button.",
         "data": {
-          "icon": "Icon in center of button",
-          "text": "Text in center of button",
+          "icon": "Icon for content",
+          "text": "Text for content",
           "title": "Title underneath button",
-          "subtitle": "Subtitle underneath Title",
-          "value": "Entity value in center of button"
+          "subtitle": "Subtitle underneath title",
+          "value": "Use entity value for content"
         }
       },
       "delete_pages": {
