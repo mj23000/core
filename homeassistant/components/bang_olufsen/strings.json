@@ -263,7 +263,7 @@
       }
     },
     "event": {
-      "halo_system": {
+      "halo_system_status": {
         "name": "System status",
         "state_attributes": {
           "event_type": {

@@ -21,12 +21,7 @@ from homeassistant.helpers.entity_platform import (
 )
 
 from . import HaloConfigEntry, MozartConfigEntry
-from .beoremote_halo.models import (
-    SystemEvent,
-    Update,
-    UpdateDisplayPage,
-    UpdateNotification,
-)
+from .beoremote_halo.models import Update, UpdateDisplayPage, UpdateNotification
 from .const import (
     BEO_REMOTE_CONTROL_KEYS,
     BEO_REMOTE_KEY_EVENTS,
@@ -330,22 +325,22 @@ async def _get_halo_entities(
     config_entry: HaloConfigEntry,
 ) -> list[HaloEvent]:
     """Get Halo Event entities from config entry."""
-    entities: list[HaloEvent] = [HaloEventSystem(config_entry)]
+    entities: list[HaloEvent] = [HaloEventSystemStatus(config_entry)]
     return entities
 
 
-class HaloEventSystem(HaloEvent):
-    """Event class for Halo system events."""
+class HaloEventSystemStatus(HaloEvent):
+    """Event class for Halo system status events."""
 
     _attr_entity_registry_enabled_default = True
     _attr_event_types = HALO_SYSTEM_EVENTS
-    _attr_translation_key = "halo_system"
+    _attr_translation_key = "halo_system_status"
 
     def __init__(self, config_entry: HaloConfigEntry) -> None:
-        """Init the proximity event."""
+        """Init the system status event."""
         super().__init__(config_entry)
 
-        self._attr_unique_id = f"{self._unique_id}_system"
+        self._attr_unique_id = f"{self._unique_id}_system_status"
 
     async def async_added_to_hass(self) -> None:
         """Turn on the dispatchers."""
@@ -360,15 +355,9 @@ class HaloEventSystem(HaloEvent):
             async_dispatcher_connect(
                 self.hass,
                 f"{self._unique_id}_{WebsocketNotification.HALO_SYSTEM}",
-                self._update_system,
+                self._async_handle_event,
             )
         )
-
-    @callback
-    def _update_system(self, event: SystemEvent) -> None:
-        """Handle system event."""
-        self._trigger_event(event.state)
-        self.async_write_ha_state()
 
     # Setup custom actions
     def async_halo_configuration(self) -> ServiceResponse:
