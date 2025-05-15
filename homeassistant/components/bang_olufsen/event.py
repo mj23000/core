@@ -61,7 +61,7 @@ async def async_setup_entry(
         platform.async_register_entity_service(
             name="halo_configuration",
             schema=None,
-            func="async_halo_configuration",
+            func="halo_configuration",
             supports_response=SupportsResponse.ONLY,
         )
 
@@ -79,17 +79,14 @@ async def async_setup_entry(
             },
             func="async_halo_notification",
         )
+        uuid_regex = vol.Match(
+            r"^[0-9a-f]{8}[-][0-9a-f]{4}[-][0-9a-f]{4}[-][0-9a-f]{4}[-][0-9a-f]{12}$"
+        )
         platform.async_register_entity_service(
             name="halo_display_page",
             schema={
-                vol.Required("page_id"): vol.All(
-                    vol.Length(min=37, max=37),
-                    cv.string,
-                ),
-                vol.Required("button_id"): vol.All(
-                    vol.Length(min=37, max=37),
-                    cv.string,
-                ),
+                vol.Required("page_id"): uuid_regex,
+                vol.Optional("button_id"): uuid_regex,
             },
             func="async_halo_display_page",
         )
@@ -360,7 +357,7 @@ class HaloEventSystemStatus(HaloEvent):
         )
 
     # Setup custom actions
-    def async_halo_configuration(self) -> ServiceResponse:
+    def halo_configuration(self) -> ServiceResponse:
         """Get raw configuration for the Halo."""
 
         return cast(ServiceResponse, self._client.configuration.to_dict())
@@ -377,7 +374,12 @@ class HaloEventSystemStatus(HaloEvent):
             )
         )
 
-    async def async_halo_display_page(self, page_id: str, button_id: str) -> None:
+    async def async_halo_display_page(
+        self, page_id: str, button_id: str | None = None
+    ) -> None:
         """Display a page and button on a Halo."""
+        kwargs = {"page_id": page_id}
+        if button_id is not None:
+            kwargs["button_id"] = button_id
 
-        await self._client.update(Update(update=UpdateDisplayPage(page_id, button_id)))
+        await self._client.update(Update(update=UpdateDisplayPage(**kwargs)))
