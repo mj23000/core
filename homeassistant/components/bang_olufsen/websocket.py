@@ -456,8 +456,6 @@ class HaloWebsocket(HaloBase):
         if (entity_state := self._get_entity_state_from_id(button_id)) is None:
             return
 
-        data = await self._entity_action_map[entity_state.domain](entity_state)
-
         # Calculate new entity value
         if (
             data := await self._entity_action_map[entity_state.domain](entity_state)
