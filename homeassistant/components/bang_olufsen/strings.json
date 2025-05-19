@@ -68,13 +68,9 @@
       },
       "button": {
         "title": "Configure button",
-        "description": "Select a configuration for the {entity} button in the {page} page.",
+        "description": "Select an icon to be shown in the middle of the `{name}` button.",
         "data": {
-          "icon": "Icon for content",
-          "text": "Text for content",
-          "title": "Title underneath button",
-          "subtitle": "Subtitle underneath title",
-          "state": "Use entity state for content"
+          "icon": "Icon"
         }
       },
       "delete_pages": {

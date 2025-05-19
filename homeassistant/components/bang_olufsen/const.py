@@ -139,12 +139,9 @@ CONF_SERIAL_NUMBER: Final = "serial_number"
 # Halo configuration
 CONF_PAGE_TITLE: Final = "page_title"
 CONF_PAGES: Final = "pages"
-CONF_TEXT: Final = "text"
 CONF_VALUE: Final = "value"
 CONF_HALO: Final = "halo"
 CONF_ENTITY_MAP: Final = "entity_map"
-CONF_TITLE: Final = "title"
-CONF_SUBTITLE: Final = "subtitle"
 CONF_DEFAULT_BUTTON: Final = "default_button"
 CONF_CONTENT: Final = "content"
 # Menu options / step IDs
@@ -166,8 +163,8 @@ class EntityMapValues(TypedDict):
     """TypedDict for Halo button information and settings."""
 
     entity_id: str
-    # Use entity value instead of Icon / Text
-    state: bool
+    # Service to use. Not applicable for all entity types
+    service: str
 
 
 # Mozart models
