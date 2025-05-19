@@ -466,7 +466,7 @@ class HaloWebsocket(HaloBase):
         action, action_data = data
 
         _LOGGER.debug(
-            "Sending %s to %s with service data: %s",
+            "Sending %s to %s with action data: %s",
             action,
             entity_state.entity_id,
             action_data,
@@ -761,7 +761,7 @@ class HaloWebsocket(HaloBase):
             action_data = {}
 
         _LOGGER.debug(
-            "Sending %s to %s with service data: %s",
+            "Sending %s to %s with action data: %s",
             action,
             entity_state.entity_id,
             action_data,
