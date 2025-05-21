@@ -68,9 +68,12 @@
       },
       "button": {
         "title": "Configure button",
-        "description": "Select an icon to be shown in the middle of the `{name}` button.",
+        "description": "Select an icon to be shown in the middle of the `{name}` button and a title to be shown underneath the button.\n\nSome domains have support for selectable button and wheel actions.",
         "data": {
-          "icon": "Icon"
+          "icon": "Icon",
+          "title": "Title",
+          "button_action": "Button action",
+          "wheel_action": "Wheel action"
         }
       },
       "delete_pages": {

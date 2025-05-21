@@ -51,6 +51,7 @@ from homeassistant.components.input_number import DOMAIN as INPUT_NUMBER_DOMAIN
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_BRIGHTNESS_STEP_PCT,
+    ATTR_TRANSITION,
     DOMAIN as LIGHT_DOMAIN,
 )
 from homeassistant.components.number import (
@@ -71,7 +72,6 @@ from homeassistant.const import (
     ATTR_SUPPORTED_FEATURES,
     CONF_ENTITY_ID,
     SERVICE_TOGGLE,
-    SERVICE_TURN_OFF,
     SERVICE_TURN_ON,
     STATE_OFF,
     STATE_ON,
@@ -300,6 +300,7 @@ class HaloWebsocket(HaloBase):
                     id=button.id,
                     value=button_value,
                     subtitle=subtitle,
+                    state=button_state,
                 )
             )
         )
@@ -511,21 +512,16 @@ class HaloWebsocket(HaloBase):
         if (
             state.state == STATE_ON
             and self._wheel_action_handlers[state.entity_id].counter <= -2
-        ):
-            action = SERVICE_TURN_OFF
-        elif (
+        ) or (
             state.state == STATE_OFF
             and self._wheel_action_handlers[state.entity_id].counter >= 2
         ):
-            action = SERVICE_TURN_ON
-        else:
-            return None
-
-        return (
-            STATE_ON if state.state == STATE_OFF else STATE_OFF,
-            action,
-            {},
-        )
+            return (
+                STATE_ON if state.state == STATE_OFF else STATE_OFF,
+                SERVICE_TOGGLE,
+                {},
+            )
+        return None
 
     def _calculate_cover_wheel_action(self, state: State) -> WheelActionTuple:
         """Calculate Cover entity wheel value and return action variables."""
@@ -588,7 +584,7 @@ class HaloWebsocket(HaloBase):
         return (
             f"{brightness_step}%",
             SERVICE_TURN_ON,
-            {ATTR_BRIGHTNESS_STEP_PCT: brightness_step},
+            {ATTR_BRIGHTNESS_STEP_PCT: brightness_step, ATTR_TRANSITION: 1.0},
         )
 
     def _calculate_no_wheel_action(self, state: State) -> WheelActionTuple:
