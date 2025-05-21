@@ -7,10 +7,20 @@ from typing import Final, TypedDict
 
 from mozart_api.models import Source, SourceTypeEnum
 
+from homeassistant.components.cover import (
+    ATTR_CURRENT_POSITION,
+    ATTR_CURRENT_TILT_POSITION,
+    ATTR_POSITION,
+    ATTR_TILT_POSITION,
+)
 from homeassistant.components.media_player import (
     MediaPlayerState,
     MediaType,
     RepeatMode,
+)
+from homeassistant.const import (
+    SERVICE_SET_COVER_POSITION,
+    SERVICE_SET_COVER_TILT_POSITION,
 )
 
 from .beoremote_halo.models import Icons, SystemEventState
@@ -173,6 +183,12 @@ class EntityMapValues(EntityMapActionValues):
 
     entity_id: str
 
+
+# Associate cover actions with their attributes
+COVER_ATTRIBUTE_MAP: Final[dict[str, tuple[str, str]]] = {
+    SERVICE_SET_COVER_POSITION: (ATTR_CURRENT_POSITION, ATTR_POSITION),
+    SERVICE_SET_COVER_TILT_POSITION: (ATTR_CURRENT_TILT_POSITION, ATTR_TILT_POSITION),
+}
 
 # Mozart models
 MOZART_MODELS: Final[list[BangOlufsenModel]] = [

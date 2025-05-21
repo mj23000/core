@@ -766,7 +766,9 @@ class HaloOptionsFlowHandler(OptionsFlow):
 
         # Scripts are called as an action, so the entity name should be set as the action
         if domain == SCRIPT_DOMAIN:
-            action_kwargs[CONF_BUTTON_ACTION] = self._entity_ids[-1]
+            action_kwargs[CONF_BUTTON_ACTION] = self._entity_ids[-1].replace(
+                f"{SCRIPT_DOMAIN}.", ""
+            )
 
         # Update entity_map
         self._entity_map[button.id] = {

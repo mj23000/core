@@ -32,17 +32,11 @@ import numpy as np
 from voluptuous import Invalid
 
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
-from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN, SERVICE_PRESS
+from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN
 from homeassistant.components.cover import (
     ATTR_CURRENT_POSITION,
     ATTR_CURRENT_TILT_POSITION,
-    ATTR_POSITION,
-    ATTR_TILT_POSITION,
     DOMAIN as COVER_DOMAIN,
-    SERVICE_SET_COVER_POSITION,
-    SERVICE_SET_COVER_TILT_POSITION,
-    SERVICE_TOGGLE_COVER_TILT,
-    CoverEntityFeature,
     CoverState,
 )
 from homeassistant.components.input_boolean import DOMAIN as INPUT_BOOLEAN_DOMAIN
@@ -60,22 +54,13 @@ from homeassistant.components.number import (
     ATTR_STEP,
     ATTR_VALUE,
     DOMAIN as NUMBER_DOMAIN,
-    SERVICE_SET_VALUE,
 )
 from homeassistant.components.scene import DOMAIN as SCENE_DOMAIN
 from homeassistant.components.script import DOMAIN as SCRIPT_DOMAIN
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN
 from homeassistant.components.switch import DOMAIN as SWITCH_DOMAIN
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    ATTR_ENTITY_ID,
-    ATTR_SUPPORTED_FEATURES,
-    CONF_ENTITY_ID,
-    SERVICE_TOGGLE,
-    SERVICE_TURN_ON,
-    STATE_OFF,
-    STATE_ON,
-)
+from homeassistant.const import ATTR_ENTITY_ID, CONF_ENTITY_ID, STATE_OFF, STATE_ON
 from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.helpers.dispatcher import async_dispatcher_send
@@ -101,8 +86,11 @@ from .beoremote_halo.models import (
 )
 from .beoremote_halo.util import clamp_button_value, interpolate_button_value
 from .const import (
+    CONF_BUTTON_ACTION,
     CONF_ENTITY_MAP,
+    CONF_WHEEL_ACTION,
     CONNECTION_STATUS,
+    COVER_ATTRIBUTE_MAP,
     EVENT_TRANSLATION_MAP,
     HALO_WEBSOCKET_EVENT,
     HALO_WHEEL_TIMEOUT,
@@ -131,8 +119,7 @@ class WheelTaskHandler:
 type UpdateTuple = tuple[str, ButtonState, int]
 
 # Return value for action methods
-type ButtonActionTuple = tuple[str, dict[str, Any]] | None
-type WheelActionTuple = tuple[str, str, dict[str, Any]] | None
+type WheelActionTuple = tuple[str, dict[str, Any]] | None
 
 
 class HaloWebsocket(HaloBase):
@@ -204,25 +191,25 @@ class HaloWebsocket(HaloBase):
 
         # Dict for associating platforms with button methods
         self._entity_action_map: dict[
-            str, Callable[[State], Coroutine[Any, Any, ButtonActionTuple]]
+            str, Callable[[State], Coroutine[Any, Any, dict[str, Any]]]
         ] = {
-            BINARY_SENSOR_DOMAIN: self._handle_no_action,
-            BUTTON_DOMAIN: self._handle_button_action,
-            COVER_DOMAIN: self._handle_cover_action,
-            INPUT_BOOLEAN_DOMAIN: self._handle_binary_action,
-            INPUT_BUTTON_DOMAIN: self._handle_button_action,
-            INPUT_NUMBER_DOMAIN: self._handle_number_action,
-            LIGHT_DOMAIN: self._handle_binary_action,
-            NUMBER_DOMAIN: self._handle_number_action,
-            SCENE_DOMAIN: self._handle_scene_action,
-            SCRIPT_DOMAIN: self._handle_script_action,
-            SENSOR_DOMAIN: self._handle_no_action,
-            SWITCH_DOMAIN: self._handle_binary_action,
+            BINARY_SENSOR_DOMAIN: self._handle_no_action_data,
+            BUTTON_DOMAIN: self._handle_no_action_data,
+            COVER_DOMAIN: self._handle_no_action_data,
+            INPUT_BOOLEAN_DOMAIN: self._handle_no_action_data,
+            INPUT_BUTTON_DOMAIN: self._handle_no_action_data,
+            INPUT_NUMBER_DOMAIN: self._handle_number_action_data,
+            LIGHT_DOMAIN: self._handle_no_action_data,
+            NUMBER_DOMAIN: self._handle_number_action_data,
+            SCENE_DOMAIN: self._handle_no_action_data,
+            SCRIPT_DOMAIN: self._handle_no_action_data,
+            SENSOR_DOMAIN: self._handle_no_action_data,
+            SWITCH_DOMAIN: self._handle_no_action_data,
         }
 
         # Dict for associating platforms with wheel action calculation methods
         self._entity_wheel_calculation_map: dict[
-            str, Callable[[State], WheelActionTuple]
+            str, Callable[[str, State], WheelActionTuple]
         ] = {
             BINARY_SENSOR_DOMAIN: self._calculate_no_wheel_action,
             BUTTON_DOMAIN: self._calculate_no_wheel_action,
@@ -423,57 +410,40 @@ class HaloWebsocket(HaloBase):
     async def _manage_entity_action(self, button_id: str) -> None:
         """Manage actions of entities."""
 
-        if (entity_state := self._get_entity_state_from_id(button_id)) is None:
+        if (state := self._get_entity_state_from_id(button_id)) is None:
             return
 
-        # Calculate new entity value
-        if (
-            data := await self._entity_action_map[entity_state.domain](entity_state)
-        ) is None:
-            _LOGGER.debug("Skipping button action")
+        # Get action from entity_map
+        if (action := self._entity_map[button_id][CONF_BUTTON_ACTION]) is None:
+            _LOGGER.debug("No button action available for %s", state.domain)
             return
 
-        action, action_data = data
+        # Get action data
+        action_data = await self._entity_action_map[state.domain](state)
 
         _LOGGER.debug(
             "Sending %s to %s with action data: %s",
             action,
-            entity_state.entity_id,
+            state.entity_id,
             action_data,
         )
+
         # Suppress any exceptions for now
-        with contextlib.suppress(Invalid):
-            await self.hass.services.async_call(
-                entity_state.domain,
-                action,
-                {ATTR_ENTITY_ID: entity_state.entity_id, **action_data},
-            )
+        # if state.domain != SCRIPT_DOMAIN:
+        await self.hass.services.async_call(
+            state.domain,
+            action,
+            {ATTR_ENTITY_ID: state.entity_id, **action_data},
+        )
+        # Scripts have to be called differently
+        # else:
+        #     await self.hass.services.async_call(SCRIPT_DOMAIN, action)
 
-    async def _handle_binary_action(self, state: State) -> ButtonActionTuple:
-        """Handle binary entity actions."""
-        return (SERVICE_TOGGLE, {})
+    async def _handle_no_action_data(self, state: State) -> dict[str, Any]:
+        """Handle action call action data."""
+        return {}
 
-    async def _handle_button_action(self, state: State) -> ButtonActionTuple:
-        """Handle Button entity button actions."""
-        return (SERVICE_PRESS, {})
-
-    async def _handle_cover_action(self, state: State) -> ButtonActionTuple:
-        """Handle Cover entity button actions."""
-        # Covers may support either toggle, toggle tilt or both.
-        # Currently tilt is used only if toggle is not available
-        action = SERVICE_TOGGLE
-        if state.attributes[ATTR_SUPPORTED_FEATURES] & CoverEntityFeature.OPEN:
-            pass
-        elif state.attributes[ATTR_SUPPORTED_FEATURES] & CoverEntityFeature.OPEN_TILT:
-            action = SERVICE_TOGGLE_COVER_TILT
-
-        return (action, {})
-
-    async def _handle_no_action(self, state: State) -> ButtonActionTuple:
-        """Handle entity with no associated button action."""
-        return None
-
-    async def _handle_number_action(self, state: State) -> ButtonActionTuple:
+    async def _handle_number_action_data(self, state: State) -> dict[str, Any]:
         """Handle Number Button entity button actions."""
 
         # Adjust state to easier determine number on/off state
@@ -494,18 +464,12 @@ class HaloWebsocket(HaloBase):
         elif number_state >= 50:
             new_state = state.attributes[ATTR_MAX]
 
-        return (SERVICE_SET_VALUE, {ATTR_VALUE: new_state})
-
-    async def _handle_scene_action(self, state: State) -> ButtonActionTuple:
-        """Handle Scene entity button actions."""
-        return (SERVICE_TURN_ON, {})
-
-    async def _handle_script_action(self, state: State) -> ButtonActionTuple:
-        """Handle Script entity button actions."""
-        return (state.name, {})
+        return {ATTR_VALUE: new_state}
 
     # Button wheel calculation methods
-    def _calculate_binary_wheel_action(self, state: State) -> WheelActionTuple:
+    def _calculate_binary_wheel_action(
+        self, button_id: str, state: State
+    ) -> WheelActionTuple:
         """Calculate Switch entity wheel value and return action variables."""
 
         # Ensure valid and not-useless action value
@@ -516,28 +480,18 @@ class HaloWebsocket(HaloBase):
             state.state == STATE_OFF
             and self._wheel_action_handlers[state.entity_id].counter >= 2
         ):
-            return (
-                STATE_ON if state.state == STATE_OFF else STATE_OFF,
-                SERVICE_TOGGLE,
-                {},
-            )
+            return (STATE_ON if state.state == STATE_OFF else STATE_OFF, {})
         return None
 
-    def _calculate_cover_wheel_action(self, state: State) -> WheelActionTuple:
+    def _calculate_cover_wheel_action(
+        self, button_id: str, state: State
+    ) -> WheelActionTuple:
         """Calculate Cover entity wheel value and return action variables."""
 
-        # Determine service based on attributes
-        if ATTR_CURRENT_POSITION in state.attributes:
-            state_attribute = ATTR_CURRENT_POSITION
-            action = SERVICE_SET_COVER_POSITION
-            action_attribute = ATTR_POSITION
-        elif ATTR_CURRENT_TILT_POSITION in state.attributes:
-            state_attribute = ATTR_CURRENT_TILT_POSITION
-            action = SERVICE_SET_COVER_TILT_POSITION
-            action_attribute = ATTR_TILT_POSITION
-        else:
-            _LOGGER.debug("Unable to determine cover action for %s", state.entity_id)
-            return None
+        # Determine attributes to set based on action
+        state_attribute, action_attribute = COVER_ATTRIBUTE_MAP[
+            str(self._entity_map[button_id][CONF_WHEEL_ACTION])
+        ]
 
         # Clamp the value.
         new_position = int(
@@ -553,13 +507,11 @@ class HaloWebsocket(HaloBase):
         if int(float(state.attributes[state_attribute])) == new_position:
             return None
 
-        return (
-            str(new_position),
-            action,
-            {action_attribute: new_position},
-        )
+        return (str(new_position), {action_attribute: new_position})
 
-    def _calculate_light_wheel_action(self, state: State) -> WheelActionTuple:
+    def _calculate_light_wheel_action(
+        self, button_id: str, state: State
+    ) -> WheelActionTuple:
         """Calculate Light entity wheel value and return action variables."""
 
         # Ensure valid and not-useless action value
@@ -583,15 +535,18 @@ class HaloWebsocket(HaloBase):
 
         return (
             f"{brightness_step}%",
-            SERVICE_TURN_ON,
             {ATTR_BRIGHTNESS_STEP_PCT: brightness_step, ATTR_TRANSITION: 1.0},
         )
 
-    def _calculate_no_wheel_action(self, state: State) -> WheelActionTuple:
+    def _calculate_no_wheel_action(
+        self, button_id: str, state: State
+    ) -> WheelActionTuple:
         """Handle entity with no associated wheel action."""
         return None
 
-    def _calculate_number_wheel_value(self, state: State) -> WheelActionTuple:
+    def _calculate_number_wheel_value(
+        self, button_id: str, state: State
+    ) -> WheelActionTuple:
         """Calculate Number entity wheel value and return action variables."""
 
         # Add the step value
@@ -617,11 +572,7 @@ class HaloWebsocket(HaloBase):
         if int(float(state.state)) == new_number:
             return None
 
-        return (
-            str(new_number),
-            SERVICE_SET_VALUE,
-            {ATTR_VALUE: new_number},
-        )
+        return (str(new_number), {ATTR_VALUE: new_number})
 
     # Button wheel action tasks
     async def _manage_entity_wheel_action_tasks(
@@ -632,13 +583,18 @@ class HaloWebsocket(HaloBase):
         if (entity_state := self._get_entity_state_from_id(button_id)) is None:
             return
 
+        # Get action from entity_map
+        if (action := self._entity_map[button_id][CONF_WHEEL_ACTION]) is None:
+            _LOGGER.debug("No wheel action available for %s", entity_state.domain)
+            return
+
         # Increment or decrement counter
         self._wheel_action_handlers[entity_state.entity_id].counter += counts
 
         # Calculate new entity value
         if (
             data := self._entity_wheel_calculation_map[entity_state.domain](
-                entity_state
+                button_id, entity_state
             )
         ) is None:
             _LOGGER.debug("Skipping wheel action task")
@@ -646,7 +602,7 @@ class HaloWebsocket(HaloBase):
             self._wheel_action_handlers[entity_state.entity_id].counter = 0
             return
 
-        preview_value, action, action_data = data
+        preview_value, action_data = data
 
         # Show preview of new value
         await self._preview_wheel_action(preview_value, button_id, entity_state)
