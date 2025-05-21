@@ -760,9 +760,13 @@ class HaloOptionsFlowHandler(OptionsFlow):
             # Get any user-selected actions
             if action_type in user_input:
                 action_kwargs[action_type] = user_input[action_type]
-            # Default to the first action if available
+            # Use the first action if available
             elif len(actions := _halo_action_map[domain][action_type]) >= 1:
                 action_kwargs[action_type] = actions[0]
+
+        # Scripts are called as an action, so the entity name should be set as the action
+        if domain == SCRIPT_DOMAIN:
+            action_kwargs[CONF_BUTTON_ACTION] = self._entity_ids[-1]
 
         # Update entity_map
         self._entity_map[button.id] = {
