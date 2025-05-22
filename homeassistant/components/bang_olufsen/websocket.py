@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Coroutine
-import contextlib
 from dataclasses import dataclass
 import logging
 from typing import TYPE_CHECKING, Any
@@ -29,7 +28,6 @@ from mozart_api.mozart_client import (
     MozartClient,
 )
 import numpy as np
-from voluptuous import Invalid
 
 from homeassistant.components.binary_sensor import DOMAIN as BINARY_SENSOR_DOMAIN
 from homeassistant.components.button import DOMAIN as BUTTON_DOMAIN
@@ -428,16 +426,11 @@ class HaloWebsocket(HaloBase):
             action_data,
         )
 
-        # Suppress any exceptions for now
-        # if state.domain != SCRIPT_DOMAIN:
         await self.hass.services.async_call(
             state.domain,
             action,
             {ATTR_ENTITY_ID: state.entity_id, **action_data},
         )
-        # Scripts have to be called differently
-        # else:
-        #     await self.hass.services.async_call(SCRIPT_DOMAIN, action)
 
     async def _handle_no_action_data(self, state: State) -> dict[str, Any]:
         """Handle action call action data."""
@@ -674,13 +667,12 @@ class HaloWebsocket(HaloBase):
             state.entity_id,
             action_data,
         )
-        # Suppress any exceptions for now
-        with contextlib.suppress(Invalid):
-            await self.hass.services.async_call(
-                state.domain,
-                action,
-                {ATTR_ENTITY_ID: state.entity_id, **action_data},
-            )
+
+        await self.hass.services.async_call(
+            state.domain,
+            action,
+            {ATTR_ENTITY_ID: state.entity_id, **action_data},
+        )
 
         # Reset counter, timer and content
         self._wheel_action_handlers[state.entity_id].counter = 0
